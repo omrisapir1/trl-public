@@ -501,7 +501,7 @@ class GRPOTrainer(Trainer):
                     self.llm = LLM(
                         model=model.name_or_path,
                         device=vllm_device,
-                        gpu_memory_utilization=0.75,
+                        gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
 
@@ -552,7 +552,7 @@ class GRPOTrainer(Trainer):
         # Gradient accumulation requires scaled loss. Normally, loss scaling in the parent class depends on whether the
         # model accepts loss-related kwargs. Since we compute our own loss, this check is irrelevant. We set
         # self.model_accepts_loss_kwargs to False to enable scaling.
-        # self.tree_of_thoughts = TreeOfThoughts(self.llm)
+        self.tree_of_thoughts = TreeOfThoughts(self.llm)
         self.model_accepts_loss_kwargs = False
 
         # Add tags to the model
