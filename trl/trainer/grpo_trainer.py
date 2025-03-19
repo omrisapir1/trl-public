@@ -501,7 +501,7 @@ class GRPOTrainer(Trainer):
                     self.llm = LLM(
                         model=model.name_or_path,
                         device=vllm_device,
-                        gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
+                        gpu_memory_utilization=0.5,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
 
@@ -511,7 +511,6 @@ class GRPOTrainer(Trainer):
                         # This is particularly useful here because we generate completions from the same prompts.
                         enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                         max_model_len=self.args.vllm_max_model_len,
-                        gpu_memory_utilization=0.5,
                     )
 
                 # Guided decoding, if enabled
