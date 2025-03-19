@@ -77,6 +77,7 @@ trl/scripts/kto.py
 trl/scripts/sft.py
 trl/scripts/utils.py
 trl/templates/lm_model_card.md
+trl/trainer/ToT.py
 trl/trainer/__init__.py
 trl/trainer/alignprop_config.py
 trl/trainer/alignprop_trainer.py
@@ -93,7 +94,7 @@ trl/trainer/gkd_config.py
 trl/trainer/gkd_trainer.py
 trl/trainer/grpo_config.py
 trl/trainer/grpo_trainer.py
-trl/trainer/grpo_tree_trainer.py
+trl/trainer/grpo_trainer_orig.py
 trl/trainer/iterative_sft_trainer.py
 trl/trainer/judges.py
 trl/trainer/kto_config.py
