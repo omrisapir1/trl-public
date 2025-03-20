@@ -377,7 +377,7 @@ class GRPOTrainer(Trainer):
         # Training arguments
         self.max_prompt_length = args.max_prompt_length
         self.max_completion_length = args.max_completion_length  # = |o_i| in the GRPO paper
-        self.num_generations = args.num_generations  # = G in the GRPO paper
+        self.num_generations = 1
         self.use_vllm = args.use_vllm
 
         # Multi-step
@@ -623,7 +623,7 @@ class GRPOTrainer(Trainer):
         print(effective_batch_size)
         print(self.num_iterations)
         print('HERRRRR')
-
+        effective_batch_size = 1
         return RepeatRandomSampler(
             data_source=self.train_dataset,
             mini_repeat_count=self.num_generations,
