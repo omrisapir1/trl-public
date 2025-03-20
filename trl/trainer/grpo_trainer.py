@@ -497,10 +497,11 @@ class GRPOTrainer(Trainer):
                         torch.distributed.new_group = new_group
 
                 new_group_patch = new_group_context() if device_type == "npu" else contextlib.nullcontext()
+                print(self.args.vllm_gpu_memory_utilization)
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
-                        tensor_parallel_size=2,
+                        tensor_parallel_size=3,
                         # device=vllm_device,
                         gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
                         dtype=self.args.vllm_dtype,
@@ -571,7 +572,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        self.model.to(torch.device("cuda:2"))
+        self.model.to(torch.device("cuda:0"))
 
 
     def _set_signature_columns_if_needed(self):
