@@ -572,7 +572,7 @@ class GRPOTrainer(Trainer):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
         self.model.to(torch.device("cuda:2"))
-        
+
 
     def _set_signature_columns_if_needed(self):
         # If `self.args.remove_unused_columns` is True, non-signature columns are removed.
@@ -783,7 +783,7 @@ class GRPOTrainer(Trainer):
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)
             with torch.no_grad():
-                ref_per_token_logps = self._get_per_token_logps(self.model, prompt_completion_ids.to(device), attention_mask.to(device), logits_to_keep)
+                ref_per_token_logps = self._get_per_token_logps(self.model, prompt_completion_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
 
 
             group_dict = {
