@@ -503,7 +503,7 @@ class GRPOTrainer(Trainer):
                         self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
                     else:
                         self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
-
+                os.environ["CUDA_VISIBLE_DEVICES"] = "3"
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
@@ -520,7 +520,7 @@ class GRPOTrainer(Trainer):
                         enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                         max_model_len=self.args.vllm_max_model_len,
                     )
-                os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
+
                 if args.vllm_guided_decoding_regex is not None:
                     guided_decoding = GuidedDecodingParams(backend="outlines", regex=args.vllm_guided_decoding_regex)
                 else:
