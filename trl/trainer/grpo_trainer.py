@@ -843,6 +843,7 @@ class GRPOTrainer(Trainer):
             per_token_loss1 = coef_1 * advantages.unsqueeze(1)
             per_token_loss2 = coef_2 * advantages.unsqueeze(1)
             per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
+            completion_mask.to(self.model.device)
             if self.beta != 0.0:
                 per_token_loss = per_token_loss + self.beta * per_token_kl
             loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
