@@ -728,7 +728,8 @@ class GRPOTrainer(Trainer):
         # if self.state.global_step != self._last_loaded_step:
         self._move_model_to_vllm()
         self._last_loaded_step = self.state.global_step
-
+        print('THIS IS DEVICE!!!!!!!!!!!!!!!!!')
+        print(self.accelerator.device)
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
