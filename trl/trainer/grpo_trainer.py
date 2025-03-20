@@ -798,13 +798,13 @@ class GRPOTrainer(Trainer):
                 ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids.to(self.ref_model.device), attention_mask.to(self.ref_model.device), logits_to_keep)
 
             group_dict = {
-                "prompt_ids": prompt_ids.to(self.model.device),
-                "prompt_mask": prompt_mask.to(self.model.device),
-                "completion_ids": completion_ids.to(self.model.device),
-                "completion_mask": completion_mask.to(self.model.device),
-                "advantages": advantages.to(self.model.device),
+                "prompt_ids": prompt_ids,
+                "prompt_mask": prompt_mask,
+                "completion_ids": completion_ids,
+                "completion_mask": completion_mask,
+                "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps.to(self.model.device) if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": ref_per_token_logps if ref_per_token_logps is not None else None,
             }
             group_dicts.append([group_dict])
 
