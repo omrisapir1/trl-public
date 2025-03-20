@@ -691,8 +691,8 @@ class GRPOTrainer(Trainer):
             else:
                 state_dict = unwrapped_model.state_dict()
             if self.accelerator.is_main_process:
-                llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
-                llm_model.load_weights(state_dict.items())
+                self.llm.apply_model(lambda model: model.load_weights(state_dict.items()))
+            
             # Unmerge the adapter to restore the model to its original state.
             # This must be done after loading weights to ensure they correspond to the merged state.
             if is_peft_model(unwrapped_model):
