@@ -448,6 +448,7 @@ class GRPOTrainer(Trainer):
                 vllm_device = self.args.vllm_device
                 device_type = PartialState().default_device.type
                 device_module = getattr(torch, device_type)
+                os.environ["CUDA_VISIBLE_DEVICES"] = "3"
                 if vllm_device == "auto":
                     if device_module.device_count() == 1:
                         vllm_device = f"{device_type}:0"  # particular case when training with onyl 1 device: share it
@@ -503,7 +504,7 @@ class GRPOTrainer(Trainer):
                         self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
                     else:
                         self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
-                os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
