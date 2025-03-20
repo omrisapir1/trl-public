@@ -845,7 +845,7 @@ class GRPOTrainer(Trainer):
             per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
             if self.beta != 0.0:
                 per_token_loss = per_token_loss + self.beta * per_token_kl
-            loss = (per_token_loss * completion_mask).sum() / completion_mask.sum()
+            loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
 
             # Log the metrics
             mode = "eval" if self.control.should_evaluate else "train"
