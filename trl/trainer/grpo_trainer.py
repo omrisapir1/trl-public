@@ -558,12 +558,12 @@ class GRPOTrainer(Trainer):
 
         # Add tags to the model
         self.model.add_model_tags(self._tag_names)
- 
+        self.ref_model = self.ref_model.to(torch.device("cuda:3"))
         if self.ref_model is not None:
             if self.is_deepspeed_enabled:
-                self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator, device_placement=True)
+                self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator, device_placement=False)
             else:
-                self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True, device_placement=True)
+                self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True, device_placement=False)
 
         if args.sync_ref_model:
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
