@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.25,
+                        gpu_memory_utilization=0.2,
                         dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
@@ -729,8 +729,6 @@ class GRPOTrainer(Trainer):
         # if self.state.global_step != self._last_loaded_step:
         self._move_model_to_vllm()
         self._last_loaded_step = self.state.global_step
-        print('THIS IS DEVICE!!!!!!!!!!!!!!!!!')
-        print(self.accelerator.device)
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
