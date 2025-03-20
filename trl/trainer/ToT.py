@@ -147,8 +147,7 @@ class TreeOfThoughts:
             else:
                 outputs = self.llm.generate(batch_prompts, self.sampling_params)
             completions = [output.outputs[0] for output in outputs]
-            prompts_token_ids = [output.prompt_token_ids for output in outputs]
-            # completions = [f'random_text {current_depth}_{i}' for i in range(len(batch_prompts))]
+            all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
 
             # Assign children to parents
             comp_idx = 0
@@ -157,6 +156,7 @@ class TreeOfThoughts:
 
                 # Add children
                 children_completions = completions[comp_idx:comp_idx + split_count]
+                prompts_token_ids = all_prompts_token_ids[comp_idx:comp_idx + split_count]
                 comp_idx += split_count
                 if split_count == 1:
                     children_completion = children_completions[0]
