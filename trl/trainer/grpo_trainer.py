@@ -509,16 +509,16 @@ class GRPOTrainer(Trainer):
                     self.llm = LLM(
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
-                        device=vllm_device,
-                        gpu_memory_utilization=0.9,
-                        dtype=self.args.vllm_dtype,
+                        # device=vllm_device,
+                        # gpu_memory_utilization=0.9,
+                        # dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
                         # tensor_parallel_size=2,
                         # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
                         # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
                         # This is particularly useful here because we generate completions from the same prompts.
-                        enable_prefix_caching=self.args.vllm_enable_prefix_caching,
+                        # enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                         max_model_len=self.args.vllm_max_model_len,
                     )
 
