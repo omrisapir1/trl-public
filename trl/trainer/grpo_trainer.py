@@ -783,7 +783,7 @@ class GRPOTrainer(Trainer):
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)
             with torch.no_grad():
-                ref_per_token_logps = self._get_per_token_logps(self.model, prompt_completion_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
+                ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids.to(self.ref_model.device), attention_mask.to(self.ref_model.device), logits_to_keep)
 
 
             group_dict = {
