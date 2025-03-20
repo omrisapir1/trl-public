@@ -791,7 +791,7 @@ class GRPOTrainer(Trainer):
             with torch.no_grad():
                 ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids.to(self.ref_model.device), attention_mask.to(self.ref_model.device), logits_to_keep)
 
-            print(self.model.device)
+            print(f'First {self.model.device}')
             group_dict = {
                 "prompt_ids": prompt_ids.to(self.model.device),
                 "prompt_mask": prompt_mask.to(self.model.device),
@@ -817,7 +817,7 @@ class GRPOTrainer(Trainer):
             input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
-            print(model.device)
+            print(f'Second {self.model.device}')
             per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
 
             # Compute the KL divergence between the model and the reference model
@@ -856,7 +856,7 @@ class GRPOTrainer(Trainer):
 
     def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys: Optional[list[str]] = None):
         inputs = self._prepare_inputs(inputs)
-        print(model.device)
+        print(f'3rd {self.model.device}')
         with torch.no_grad():
             with self.compute_loss_context_manager():
                 loss = self.compute_loss(model, inputs)
