@@ -515,7 +515,9 @@ class GRPOTrainer(Trainer):
                         enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                         max_model_len=self.args.vllm_max_model_len,
                     )
-
+                for name, param in self.llm.model.named_parameters():
+                    print(f"Parameter: {name}, Data Type: {param.dtype}")
+                    break  # Remove this break to list all parameters
                 # Guided decoding, if enabled
                 if args.vllm_guided_decoding_regex is not None:
                     guided_decoding = GuidedDecodingParams(backend="outlines", regex=args.vllm_guided_decoding_regex)
