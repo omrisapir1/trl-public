@@ -817,24 +817,24 @@ class GRPOTrainer(Trainer):
         # Compute the per-token log probabilities for the model
         all_losses = []
         for i, inputs in enumerate(inputs_list):
-            print(f'I {i}')
-            print(inputs)
             prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
             completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
             input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
-            per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
+            per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device), attention_mask.to(model.device), logits_to_keep.to(model.device))
 
             # Compute the KL divergence between the model and the reference model
             if self.beta != 0.0:
                 ref_per_token_logps = inputs["ref_per_token_logps"]
+                ref_per_token_logps = ref_per_token_logps.to(model.device)
                 per_token_kl = (
                     torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
                 )
 
             # Compute the loss
             advantages = inputs["advantages"]
+            advantages = advantages.to(model.device)
             # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
             # _generate_and_score_completions) and use per_token_logps.detach() instead.
             old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
