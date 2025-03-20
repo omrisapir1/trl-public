@@ -497,15 +497,12 @@ class GRPOTrainer(Trainer):
                         torch.distributed.new_group = new_group
 
                 new_group_patch = new_group_context() if device_type == "npu" else contextlib.nullcontext()
-                print('THIS IS IT----------')
-                print(self.args.vllm_gpu_memory_utilization)
-                print('THIS IS IT DONE----------')
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
                         tensor_parallel_size=2,
                         # device=vllm_device,
-                        gpu_memory_utilization=0.5,
+                        gpu_memory_utilization=0.75,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
 
