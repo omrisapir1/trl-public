@@ -692,7 +692,8 @@ class GRPOTrainer(Trainer):
             else:
                 state_dict = unwrapped_model.state_dict()
             if self.accelerator.is_main_process:
-                self.llm.apply_model(lambda model: model.load_weights(state_dict.items()))
+                llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+                llm_model.load_weights(state_dict.items())
 
             # Unmerge the adapter to restore the model to its original state.
             # This must be done after loading weights to ensure they correspond to the merged state.
@@ -723,7 +724,10 @@ class GRPOTrainer(Trainer):
         4) For each valid group with non-zero std dev in rewards, compute advantages and collect token/attention/logits info.
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
-        self._move_model_to_vllm()
+        if self.state.global_step != self._last_loaded_step:
+            self._move_model_to_vllm()
+            self._last_loaded_step = self.state.global_step
+
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
