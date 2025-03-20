@@ -500,7 +500,8 @@ class GRPOTrainer(Trainer):
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
-                        device=vllm_device,
+                        tensor_parallel_size=2,
+                        # device=vllm_device,
                         gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
