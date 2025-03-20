@@ -504,9 +504,9 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.95,
+                        gpu_memory_utilization=0.9,
                         dtype=self.args.vllm_dtype,
-                        trust_remote_code=True,
+                        # trust_remote_code=True,
 
                         # tensor_parallel_size=2,
                         # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
