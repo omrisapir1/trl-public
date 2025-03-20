@@ -503,7 +503,7 @@ class GRPOTrainer(Trainer):
                     if self.is_deepspeed_enabled:
                         self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
                     else:
-                        self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
+                        self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True, se)
 
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
@@ -791,7 +791,7 @@ class GRPOTrainer(Trainer):
             with torch.no_grad():
                 ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids.to(self.ref_model.device), attention_mask.to(self.ref_model.device), logits_to_keep)
 
-
+            print(self.model.device)
             group_dict = {
                 "prompt_ids": prompt_ids.to(self.model.device),
                 "prompt_mask": prompt_mask.to(self.model.device),
