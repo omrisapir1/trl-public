@@ -801,7 +801,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask.to(self.model.device),
                 "advantages": advantages.to(self.model.device),
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps.to(device) if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": ref_per_token_logps.to(self.model.device) if ref_per_token_logps is not None else None,
             }
             group_dicts.append(group_dict)
 
