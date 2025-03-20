@@ -567,7 +567,7 @@ class GRPOTrainer(Trainer):
         self.model.add_model_tags(self._tag_names)
 
 
-
+        self.model.to('cuda:0')
         if args.sync_ref_model:
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
 
