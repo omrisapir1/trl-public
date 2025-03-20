@@ -778,7 +778,12 @@ class GRPOTrainer(Trainer):
 
 
             child_nodes = tree[child_indices[0]:child_indices[-1]+1]
-            prompt_ids = torch.stack([torch.tensor(c['prompt_ids']) for c in child_nodes],dim=0)
+            try:
+                prompt_ids = torch.stack([torch.tensor(c['prompt_ids']) for c in child_nodes],dim=0)
+            except:
+                print(child_nodes)
+                print(child_indices)
+                raise
             completion_ids = [torch.tensor(c['completion_ids']) for c in child_nodes]
             completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
 
