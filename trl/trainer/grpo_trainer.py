@@ -794,9 +794,6 @@ class GRPOTrainer(Trainer):
             }
             group_dicts.append(group_dict)
 
-        json.dump(tree,open('full_tree.json','w'))
-        print(group_dicts)
-        raise
         return group_dicts
 
     @profiling_decorator

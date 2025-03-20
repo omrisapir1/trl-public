@@ -9,18 +9,16 @@ df = df.iloc[:2]
 hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 
 
-# dataset = load_dataset("trl-lib/tldr", split="train")
-# dataset = dataset.filter(lambda x: random.random() < 0.0001)
-# Dummy reward function: count the number of unique caracteres in the completions
-def reward_num_unique_chars(completions, **kwargs):
-    return [len(set(c)) for c in completions]
+
+def dumy_func(completions, **kwargs):
+    return
 
 training_args = GRPOConfig(output_dir="GRPO", use_vllm=True)
 
 
 trainer = GRPOTrainer(
     model="omrisap/Qwen2.5-1.5B_30K_COT_SFT",
-    reward_funcs=reward_num_unique_chars,
+    reward_funcs=dumy_func,
     train_dataset=hf_dataset,
     args=training_args,
 )
