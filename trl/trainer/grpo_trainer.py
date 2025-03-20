@@ -497,8 +497,13 @@ class GRPOTrainer(Trainer):
                         torch.distributed.new_group = new_group
 
                 new_group_patch = new_group_context() if device_type == "npu" else contextlib.nullcontext()
-                print('TYPE!!!!!!!!!!!!!!!!!')
-                print(self.args.vllm_dtype)
+
+                if self.ref_model is not None:
+                    if self.is_deepspeed_enabled:
+                        self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
+                    else:
+                        self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
+
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
@@ -560,11 +565,7 @@ class GRPOTrainer(Trainer):
         # Add tags to the model
         self.model.add_model_tags(self._tag_names)
 
-        if self.ref_model is not None:
-            if self.is_deepspeed_enabled:
-                self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator, device_placement=False)
-            else:
-                self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True, device_placement=False)
+
 
         if args.sync_ref_model:
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
