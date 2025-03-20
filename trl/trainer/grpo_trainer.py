@@ -558,13 +558,12 @@ class GRPOTrainer(Trainer):
 
         # Add tags to the model
         self.model.add_model_tags(self._tag_names)
-        print(self.accelerator)
-        print(self.device)
+ 
         if self.ref_model is not None:
             if self.is_deepspeed_enabled:
-                self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
+                self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator, device_placement=True)
             else:
-                self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
+                self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True, device_placement=True)
 
         if args.sync_ref_model:
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
