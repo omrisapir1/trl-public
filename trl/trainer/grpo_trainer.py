@@ -722,7 +722,7 @@ class GRPOTrainer(Trainer):
         4) For each valid group with non-zero std dev in rewards, compute advantages and collect token/attention/logits info.
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
-
+        self._move_model_to_vllm()
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
