@@ -505,7 +505,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         tensor_parallel_size=3,
                         # device=vllm_device,
-                        gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
+                        gpu_memory_utilization=0.75,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
 
