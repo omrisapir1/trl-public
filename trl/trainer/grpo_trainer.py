@@ -559,7 +559,7 @@ class GRPOTrainer(Trainer):
 
         # Add tags to the model
         self.model.add_model_tags(self._tag_names)
-        self.ref_model = self.ref_model.to(torch.device("cuda:3"))
+
         if self.ref_model is not None:
             if self.is_deepspeed_enabled:
                 self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator, device_placement=False)
@@ -572,7 +572,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        self.model.to(torch.device("cuda:0"))
+
 
 
     def _set_signature_columns_if_needed(self):
