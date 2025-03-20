@@ -448,7 +448,7 @@ class GRPOTrainer(Trainer):
                 vllm_device = self.args.vllm_device
                 device_type = PartialState().default_device.type
                 device_module = getattr(torch, device_type)
-                
+
                 if vllm_device == "auto":
                     if device_module.device_count() == 1:
                         vllm_device = f"{device_type}:0"  # particular case when training with onyl 1 device: share it
@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.9,
+                        gpu_memory_utilization=0.5,
                         dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
