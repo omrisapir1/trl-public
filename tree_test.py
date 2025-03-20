@@ -4,7 +4,7 @@ from trl import GRPOTrainer, GRPOConfig
 import random
 
 
-df = pd.read_pickle('/Users/omri.sapir/learning/math_kaggle/SECOT_MATH/data/15K_TRPO_trainset.pkl')[['problem','numerical_solution']]
+df = pd.read_pickle('15K_TRPO_trainset.pkl')[['problem','numerical_solution']]
 df = df.iloc[:2]
 hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 
@@ -13,7 +13,7 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,vllm_device='cuda:2')
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,vllm_device='cuda:3')
 
 
 trainer = GRPOTrainer(
