@@ -795,11 +795,11 @@ class GRPOTrainer(Trainer):
 
 
             group_dict = {
-                "prompt_ids": prompt_ids.to(device),
-                "prompt_mask": prompt_mask.to(device),
-                "completion_ids": completion_ids.to(device),
-                "completion_mask": completion_mask.to(device),
-                "advantages": advantages.to(device),
+                "prompt_ids": prompt_ids.to(self.model.device),
+                "prompt_mask": prompt_mask.to(self.model.device),
+                "completion_ids": completion_ids.to(self.model.device),
+                "completion_mask": completion_mask.to(self.model.device),
+                "advantages": advantages.to(self.model.device),
                 "old_per_token_logps": None,
                 "ref_per_token_logps": ref_per_token_logps.to(device) if ref_per_token_logps is not None else None,
             }
@@ -820,7 +820,7 @@ class GRPOTrainer(Trainer):
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
 
-            per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device), attention_mask.to(model.device), logits_to_keep)
+            per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
 
             # Compute the KL divergence between the model and the reference model
             if self.beta != 0.0:
