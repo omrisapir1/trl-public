@@ -618,6 +618,12 @@ class GRPOTrainer(Trainer):
             * self.accelerator.num_processes
             * self.args.gradient_accumulation_steps
         )
+
+        print(self.num_generations)
+        print(effective_batch_size)
+        print(self.num_iterations)
+        print('HERRRRR')
+
         return RepeatRandomSampler(
             data_source=self.train_dataset,
             mini_repeat_count=self.num_generations,
