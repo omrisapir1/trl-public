@@ -502,9 +502,9 @@ class GRPOTrainer(Trainer):
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
                         model=model.name_or_path,
-                        tensor_parallel_size=2,
-                        # device=vllm_device,
-                        gpu_memory_utilization=0.75,
+                        # tensor_parallel_size=2,
+                        device=vllm_device,
+                        gpu_memory_utilization=0.95,
                         dtype=self.args.vllm_dtype,
                         trust_remote_code=True,
 
@@ -515,10 +515,7 @@ class GRPOTrainer(Trainer):
                         enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                         max_model_len=self.args.vllm_max_model_len,
                     )
-                for name, param in self.llm.model.named_parameters():
-                    print(f"Parameter: {name}, Data Type: {param.dtype}")
-                    break  # Remove this break to list all parameters
-                # Guided decoding, if enabled
+
                 if args.vllm_guided_decoding_regex is not None:
                     guided_decoding = GuidedDecodingParams(backend="outlines", regex=args.vllm_guided_decoding_regex)
                 else:

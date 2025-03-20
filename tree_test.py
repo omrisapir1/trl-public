@@ -13,7 +13,7 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO", use_vllm=True)
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,vllm_device='cuda:2')
 
 
 trainer = GRPOTrainer(
@@ -21,5 +21,6 @@ trainer = GRPOTrainer(
     reward_funcs=dumy_func,
     train_dataset=hf_dataset,
     args=training_args,
+
 )
 trainer.train()
