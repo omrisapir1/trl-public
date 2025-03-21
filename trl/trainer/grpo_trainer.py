@@ -801,30 +801,30 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
             batch_size = prompt_completion_ids.size(0)
             max_chunk_size = 2
-            with torch.no_grad():
-                if batch_size >= max_chunk_size:
-                    outputs = []
-                    # Process the batch in chunks along the first dimension
-                    for i in range(0, batch_size, max_chunk_size):
-                        p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                        m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-
-                        sub_output = self._get_per_token_logps(
-                            self.ref_model,
-                            p_chunk,
-                            m_chunk,
-                            logits_to_keep
-                        )
-                        outputs.append(sub_output)
-                    # Concatenate the outputs along the batch dimension
-                    ref_per_token_logps = torch.cat(outputs, dim=0)
-                else:
-                    ref_per_token_logps = self._get_per_token_logps(
-                        self.ref_model,
-                        prompt_completion_ids.to(self.ref_model.device),
-                        attention_mask.to(self.ref_model.device),
-                        logits_to_keep
-                    )
+            # with torch.no_grad():
+            #     if batch_size >= max_chunk_size:
+            #         outputs = []
+            #         # Process the batch in chunks along the first dimension
+            #         for i in range(0, batch_size, max_chunk_size):
+            #             p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+            #             m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+            #
+            #             sub_output = self._get_per_token_logps(
+            #                 self.ref_model,
+            #                 p_chunk,
+            #                 m_chunk,
+            #                 logits_to_keep
+            #             )
+            #             outputs.append(sub_output)
+            #         # Concatenate the outputs along the batch dimension
+            #         ref_per_token_logps = torch.cat(outputs, dim=0)
+            #     else:
+            #         ref_per_token_logps = self._get_per_token_logps(
+            #             self.ref_model,
+            #             prompt_completion_ids.to(self.ref_model.device),
+            #             attention_mask.to(self.ref_model.device),
+            #             logits_to_keep
+            #         )
 
             group_dict = {
                 "prompt_ids": prompt_ids,
@@ -833,7 +833,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": None#ref_per_token_logps if ref_per_token_logps is not None else None,
             }
             group_dicts.append(group_dict)
 
