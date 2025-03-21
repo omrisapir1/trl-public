@@ -796,8 +796,33 @@ class GRPOTrainer(Trainer):
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)
+            batch_size = prompt_completion_ids.size(0)
             with torch.no_grad():
-                ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids.to(self.ref_model.device), attention_mask.to(self.ref_model.device), logits_to_keep)
+                with torch.no_grad():
+                    if batch_size == 4:
+                        # Split prompt_completion_ids and attention_mask along the batch dimension
+                        prompt_chunks = torch.chunk(prompt_completion_ids, 2, dim=0)
+                        mask_chunks = torch.chunk(attention_mask, 2, dim=0)
+
+                        outputs = []
+                        for p_chunk, m_chunk in zip(prompt_chunks, mask_chunks):
+                            sub_output = self._get_per_token_logps(
+                                self.ref_model,
+                                p_chunk.to(self.ref_model.device),
+                                m_chunk.to(self.ref_model.device),
+                                logits_to_keep
+                            )
+                            outputs.append(sub_output)
+
+                        # Concatenate outputs along the batch dimension
+                        ref_per_token_logps = torch.cat(outputs, dim=0)
+                    else:
+                        ref_per_token_logps = self._get_per_token_logps(
+                            self.ref_model,
+                            prompt_completion_ids.to(self.ref_model.device),
+                            attention_mask.to(self.ref_model.device),
+                            logits_to_keep
+                        )
 
             group_dict = {
                 "prompt_ids": prompt_ids,
