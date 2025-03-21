@@ -852,7 +852,7 @@ class GRPOTrainer(Trainer):
         per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
 
         # Compute the KL divergence between the model and the reference model
-        if self.beta != 0.0:
+        if False:#self.beta != 0.0:
             ref_per_token_logps = inputs["ref_per_token_logps"]
             ref_per_token_logps = ref_per_token_logps.to(model.device)
             per_token_kl = (
