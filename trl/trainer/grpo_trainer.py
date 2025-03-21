@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.6,
+                        gpu_memory_utilization=0.7,
                         dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
@@ -824,10 +824,7 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
-        print('PROMPT IDS')
-        print(prompt_ids.shape)
-        print('completion_ids')
-        print(completion_ids.shape)
+
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
             ref_per_token_logps = inputs["ref_per_token_logps"]
@@ -868,8 +865,7 @@ class GRPOTrainer(Trainer):
 
     def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys: Optional[list[str]] = None):
         inputs = self._prepare_inputs(inputs)
-        print('inputs')
-        print(inputs)
+
         with torch.no_grad():
             with self.compute_loss_context_manager():
                 loss = self.compute_loss(model, inputs)

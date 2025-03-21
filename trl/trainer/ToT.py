@@ -1,5 +1,6 @@
-
+import json
 import re
+import time
 
 from vllm import SamplingParams
 import numpy as np
@@ -239,4 +240,5 @@ class TreeOfThoughts:
                 n['reward'] = np.mean(rewards)
             else:
                 n['dont_calc_loss'] = True
+        json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
 
