@@ -28,7 +28,7 @@ class TreeOfThoughts:
         self.tokenizer= self.llm.get_tokenizer()
         self.sampling_params = SamplingParams(
             temperature=TEMPERATURE,
-            max_tokens=UNIFIED_MAX_TOKENS,#MAX_THINK_TOKENS,
+            max_tokens=MAX_THINK_TOKENS,
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
@@ -244,5 +244,5 @@ class TreeOfThoughts:
         if random.random() < 0.05:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
         else:
-            json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
+            json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
 
