@@ -815,7 +815,7 @@ class GRPOTrainer(Trainer):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
         # Compute the per-token log probabilities for the model
-        
+
 
         print(f'I----')
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
