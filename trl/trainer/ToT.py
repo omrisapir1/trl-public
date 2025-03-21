@@ -18,7 +18,7 @@ THINK_END_TOKEN = '</think>'
 ANSWER_END_TOKEN = '</answer>'
 END_OF_TEXT_ID_TOKEN = 151643
 
-UNIFIED_MAX_TOKENS = 1800
+UNIFIED_MAX_TOKENS = 1600
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=3, max_depth=25):
