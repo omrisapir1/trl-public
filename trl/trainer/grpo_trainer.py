@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.85,
+                        gpu_memory_utilization=0.6,
                         dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
@@ -574,7 +574,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        # self.ref_model = self.ref_model.to('cuda:1')
+        self.ref_model = self.ref_model.to('cuda:1')
 
 
 
