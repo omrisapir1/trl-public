@@ -6,15 +6,17 @@ import numpy as np
 
 MAX_THINK_TOKENS = 256
 MAX_END_TOKENS = 512
-TEMPERATURE = 1.3#0.9
-TOP_P = 0.95#1.0
-TOP_K = 100#50
+TEMPERATURE = 0.9
+TOP_P = 1.0
+TOP_K = 50
 REPETITION_PENALTY = 1.0
 MODEL = 'omrisap/Qwen2.5-1.5B_30K_COT_SFT'
 THINK_TAG_START = '<think></think>'
 THINK_END_TOKEN = '</think>'
 ANSWER_END_TOKEN = '</answer>'
 END_OF_TEXT_ID_TOKEN = 151643
+
+UNIFIED_MAX_TOKENS = 2000
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=3, max_depth=25):
@@ -24,7 +26,7 @@ class TreeOfThoughts:
         self.tokenizer= self.llm.get_tokenizer()
         self.sampling_params = SamplingParams(
             temperature=TEMPERATURE,
-            max_tokens=MAX_THINK_TOKENS,
+            max_tokens=UNIFIED_MAX_TOKENS,#MAX_THINK_TOKENS,
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
@@ -34,7 +36,7 @@ class TreeOfThoughts:
         )
         self.last_sampling_params = SamplingParams(
             temperature=TEMPERATURE,
-            max_tokens=MAX_END_TOKENS,
+            max_tokens=UNIFIED_MAX_TOKENS,#MAX_END_TOKENS,
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
@@ -44,7 +46,7 @@ class TreeOfThoughts:
         )
         self.no_more_splits_sampling_params = SamplingParams(
             temperature=TEMPERATURE,
-            max_tokens=(self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
+            max_tokens=UNIFIED_MAX_TOKENS,#(self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
