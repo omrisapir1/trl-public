@@ -871,14 +871,14 @@ class GRPOTrainer(Trainer):
         per_token_loss2 = coef_2 * advantages.unsqueeze(1)
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         completion_mask = completion_mask.to(self.model.device)
-        if self.beta != 0.0:
+        if False:#self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
 
-        if self.beta != 0.0:
+        if False:#self.beta != 0.0:
             mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
             self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
 
