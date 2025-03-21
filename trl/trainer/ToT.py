@@ -91,13 +91,13 @@ class TreeOfThoughts:
         elif node.get('last_chance'):
             return 1
         if node['depth'] == 0:
-            return 2
-        elif node['depth'] == 1:
-            return 2
-        elif node['depth'] == 2:
-            return 3
-        elif node['depth'] == 3:
             return 4
+        elif node['depth'] == 1:
+            return 3
+        elif node['depth'] == 2:
+            return 2
+        elif node['depth'] == 3:
+            return 2
         return 1
 
 
