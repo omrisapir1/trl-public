@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.6,
+                        gpu_memory_utilization=0.85,
                         # dtype=self.args.vllm_dtype,
                         max_num_seqs=48,
                         dtype=torch.bfloat16,
