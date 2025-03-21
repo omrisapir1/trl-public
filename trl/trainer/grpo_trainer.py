@@ -859,7 +859,7 @@ class GRPOTrainer(Trainer):
             is_clipped = (per_token_loss1 < per_token_loss2).float()
             clip_ratio = (is_clipped * completion_mask).sum() / completion_mask.sum()
             self._metrics[mode]["clip_ratio"].append(self.accelerator.gather_for_metrics(clip_ratio).mean().item())
-            yield loss
+            return loss
 
 
     def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys: Optional[list[str]] = None):
