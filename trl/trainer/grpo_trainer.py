@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.6,
+                        gpu_memory_utilization=0.9,
                         dtype=self.args.vllm_dtype,
                         # trust_remote_code=True,
 
@@ -574,7 +574,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        self.ref_model = self.ref_model.to('cuda:1')
+        self.ref_model = self.ref_model.to('cpu')
 
 
 
@@ -798,31 +798,30 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
             batch_size = prompt_completion_ids.size(0)
             with torch.no_grad():
-                with torch.no_grad():
-                    if batch_size == 4:
-                        # Split prompt_completion_ids and attention_mask along the batch dimension
-                        prompt_chunks = torch.chunk(prompt_completion_ids, 2, dim=0)
-                        mask_chunks = torch.chunk(attention_mask, 2, dim=0)
-
-                        outputs = []
-                        for p_chunk, m_chunk in zip(prompt_chunks, mask_chunks):
-                            sub_output = self._get_per_token_logps(
-                                self.ref_model,
-                                p_chunk.to(self.ref_model.device),
-                                m_chunk.to(self.ref_model.device),
-                                logits_to_keep
-                            )
-                            outputs.append(sub_output)
-
-                        # Concatenate outputs along the batch dimension
-                        ref_per_token_logps = torch.cat(outputs, dim=0)
-                    else:
-                        ref_per_token_logps = self._get_per_token_logps(
-                            self.ref_model,
-                            prompt_completion_ids.to(self.ref_model.device),
-                            attention_mask.to(self.ref_model.device),
-                            logits_to_keep
-                        )
+                    # if batch_size == 4:
+                    #     # Split prompt_completion_ids and attention_mask along the batch dimension
+                    #     prompt_chunks = torch.chunk(prompt_completion_ids, 2, dim=0)
+                    #     mask_chunks = torch.chunk(attention_mask, 2, dim=0)
+                    #
+                    #     outputs = []
+                    #     for p_chunk, m_chunk in zip(prompt_chunks, mask_chunks):
+                    #         sub_output = self._get_per_token_logps(
+                    #             self.ref_model,
+                    #             p_chunk.to(self.ref_model.device),
+                    #             m_chunk.to(self.ref_model.device),
+                    #             logits_to_keep
+                    #         )
+                    #         outputs.append(sub_output)
+                    #
+                    #     # Concatenate outputs along the batch dimension
+                    #     ref_per_token_logps = torch.cat(outputs, dim=0)
+                    # else:
+                    ref_per_token_logps = self._get_per_token_logps(
+                        self.ref_model,
+                        prompt_completion_ids.to(self.ref_model.device),
+                        attention_mask.to(self.ref_model.device),
+                        logits_to_keep
+                    )
 
             group_dict = {
                 "prompt_ids": prompt_ids,
