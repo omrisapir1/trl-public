@@ -311,7 +311,7 @@ class GRPOTrainer(Trainer):
 
         # Reference model
         self.beta = args.beta
-        if self.beta == 0.0:
+        if True:#self.beta == 0.0:
             # If beta is 0.0, the reference model is not needed
             self.ref_model = None
         elif is_deepspeed_zero3_enabled():
@@ -577,8 +577,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        self.ref_model = self.ref_model.to('cuda:1')
-
+        # self.ref_model = self.ref_model.to('cuda:1')
 
 
     def _set_signature_columns_if_needed(self):
