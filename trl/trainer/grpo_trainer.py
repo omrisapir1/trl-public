@@ -311,7 +311,7 @@ class GRPOTrainer(Trainer):
 
         # Reference model
         self.beta = args.beta
-        if True:#self.beta == 0.0:
+        if self.beta == 0.0:
             # If beta is 0.0, the reference model is not needed
             self.ref_model = None
         elif is_deepspeed_zero3_enabled():
@@ -510,7 +510,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.85,
+                        gpu_memory_utilization=0.6,
                         # dtype=self.args.vllm_dtype,
                         max_num_seqs=48,
                         dtype=torch.bfloat16,
@@ -577,7 +577,8 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        # self.ref_model = self.ref_model.to('cuda:1')
+        self.ref_model = self.ref_model.to('cuda:1')
+
 
 
     def _set_signature_columns_if_needed(self):
@@ -734,9 +735,9 @@ class GRPOTrainer(Trainer):
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
 
-        if self.state.global_step != self._last_loaded_step:
-            self._move_model_to_vllm()
-            self._last_loaded_step = self.state.global_step
+        # if self.state.global_step != self._last_loaded_step:
+        #     self._move_model_to_vllm()
+        #     self._last_loaded_step = self.state.global_step
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
@@ -800,30 +801,30 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
             batch_size = prompt_completion_ids.size(0)
             max_chunk_size = 2
-            # with torch.no_grad():
-            #     if batch_size >= max_chunk_size:
-            #         outputs = []
-            #         # Process the batch in chunks along the first dimension
-            #         for i in range(0, batch_size, max_chunk_size):
-            #             p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-            #             m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-            #
-            #             sub_output = self._get_per_token_logps(
-            #                 self.ref_model,
-            #                 p_chunk,
-            #                 m_chunk,
-            #                 logits_to_keep
-            #             )
-            #             outputs.append(sub_output)
-            #         # Concatenate the outputs along the batch dimension
-            #         ref_per_token_logps = torch.cat(outputs, dim=0)
-            #     else:
-            #         ref_per_token_logps = self._get_per_token_logps(
-            #             self.ref_model,
-            #             prompt_completion_ids.to(self.ref_model.device),
-            #             attention_mask.to(self.ref_model.device),
-            #             logits_to_keep
-            #         )
+            with torch.no_grad():
+                if batch_size >= max_chunk_size:
+                    outputs = []
+                    # Process the batch in chunks along the first dimension
+                    for i in range(0, batch_size, max_chunk_size):
+                        p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+                        m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+
+                        sub_output = self._get_per_token_logps(
+                            self.ref_model,
+                            p_chunk,
+                            m_chunk,
+                            logits_to_keep
+                        )
+                        outputs.append(sub_output)
+                    # Concatenate the outputs along the batch dimension
+                    ref_per_token_logps = torch.cat(outputs, dim=0)
+                else:
+                    ref_per_token_logps = self._get_per_token_logps(
+                        self.ref_model,
+                        prompt_completion_ids.to(self.ref_model.device),
+                        attention_mask.to(self.ref_model.device),
+                        logits_to_keep
+                    )
 
             group_dict = {
                 "prompt_ids": prompt_ids,
@@ -832,7 +833,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": None#ref_per_token_logps if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": ref_per_token_logps if ref_per_token_logps is not None else None,
             }
             group_dicts.append(group_dict)
 
@@ -852,7 +853,7 @@ class GRPOTrainer(Trainer):
         per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
 
         # Compute the KL divergence between the model and the reference model
-        if False:#self.beta != 0.0:
+        if self.beta != 0.0:
             ref_per_token_logps = inputs["ref_per_token_logps"]
             ref_per_token_logps = ref_per_token_logps.to(model.device)
             per_token_kl = (
@@ -871,14 +872,14 @@ class GRPOTrainer(Trainer):
         per_token_loss2 = coef_2 * advantages.unsqueeze(1)
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         completion_mask = completion_mask.to(self.model.device)
-        if False:#self.beta != 0.0:
+        if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
 
-        if False:#self.beta != 0.0:
+        if self.beta != 0.0:
             mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
             self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
 
