@@ -730,6 +730,8 @@ class GRPOTrainer(Trainer):
         4) For each valid group with non-zero std dev in rewards, compute advantages and collect token/attention/logits info.
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
+        print(f'Gloabal step {self.state.global_step}')
+        print(f'_last_loaded_step {self._last_loaded_step}')
         if self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
@@ -816,8 +818,6 @@ class GRPOTrainer(Trainer):
             raise ValueError("The GRPOTrainer does not support returning outputs")
         # Compute the per-token log probabilities for the model
 
-
-        print(f'I----')
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
         completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
