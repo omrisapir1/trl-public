@@ -117,7 +117,7 @@ class TreeOfThoughts:
             return 0
         elif node.get('last_chance'):
             return 1
-        elif node['next_split']:
+        elif node.get('next_split'):
             return node['next_split']
         if node['depth'] == 0:
             return 4
@@ -149,7 +149,7 @@ class TreeOfThoughts:
 
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
-            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+2) + len(THINK_BOTH_TOKEN)
+            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+1) + len(THINK_BOTH_TOKEN)
             tree[0]['text'] += full_ans[:start_index]
         else:
             print('Not Found')
