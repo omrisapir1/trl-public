@@ -16,12 +16,14 @@ MODEL = 'omrisap/Qwen2.5-1.5B_30K_COT_SFT'
 THINK_BOTH_TOKEN = '<think></think>'
 THINK_END_TOKEN = '</think>'
 ANSWER_END_TOKEN = '</answer>'
+ANSWER_START_TOKEN = '<answer>'
 END_OF_TEXT_ID_TOKEN = 151643
 
 UNIFIED_MAX_TOKENS = 512
 MAX_FIRST_ANS_TOKENS = 2048
 
 N_TOTAL_SPLITS = 4
+LAST_SPLIT = 2
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=24, max_depth=25):
@@ -36,7 +38,7 @@ class TreeOfThoughts:
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
-            stop=["</think>", '</answer>'],
+            stop=["</think>", '</answer>','<answer>'],
             n=1  # Generate one continuation per prompt
         )
         self.last_sampling_params = SamplingParams(
@@ -115,14 +117,14 @@ class TreeOfThoughts:
             return 0
         elif node.get('last_chance'):
             return 1
+        elif node['next_split']:
+            return node['next_split']
         if node['depth'] == 0:
-            return 2
-        elif node['depth'] == 1:
-            return 2
-        elif node['depth'] == 2:
-            return 3
-        elif node['depth'] == 3:
             return 4
+        elif node['depth'] == 1:
+            return 3
+        elif node['depth'] == 2:
+            return 2
         return 1
 
 
@@ -148,7 +150,7 @@ class TreeOfThoughts:
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
             start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS) + len(THINK_BOTH_TOKEN)
-            tree[0]['text'] += full_ans[start_index:]
+            tree[0]['text'] += full_ans[:start_index]
         else:
             print('Not Found')
 
@@ -159,21 +161,6 @@ class TreeOfThoughts:
 
         # completions = [output.outputs[0] for output in first_full_output]
         # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         current_depth = 0
         final_nodes = []
@@ -241,6 +228,8 @@ class TreeOfThoughts:
                         if stop_token == ANSWER_END_TOKEN:
                             parent['reward'] = self.is_correct_solution(text, numerical_label)
                             parent['to_stop'] = True
+                        elif stop_token == ANSWER_START_TOKEN:
+                            parent['next_split'] = LAST_SPLIT
                     parent['last_chance'] = False
 
                     parent['completion_ids'] += children_completion.token_ids
@@ -274,6 +263,9 @@ class TreeOfThoughts:
                     elif children_completion.stop_reason == END_OF_TEXT_ID_TOKEN:
                         node['reward'] = 0
                         node['to_stop'] = True
+                    elif children_completion.stop_reason == ANSWER_START_TOKEN:
+                        parent['next_split'] = LAST_SPLIT
+
                     node['text'] = text
                     tree.append(node)
 
