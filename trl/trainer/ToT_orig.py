@@ -19,7 +19,6 @@ ANSWER_END_TOKEN = '</answer>'
 END_OF_TEXT_ID_TOKEN = 151643
 
 UNIFIED_MAX_TOKENS = 512
-MAX_FIRST_ANS_TOKENS = 2048
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=24, max_depth=25):
@@ -53,28 +52,6 @@ class TreeOfThoughts:
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
-            skip_special_tokens=False,
-            stop=['</answer>'],
-            n=1  # Generate one continuation per prompt
-        )
-        self.no_more_splits_sampling_params = SamplingParams(
-            temperature=TEMPERATURE,
-            max_tokens=UNIFIED_MAX_TOKENS,
-            # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
-            top_p=TOP_P,
-            top_k=TOP_K,
-            repetition_penalty=REPETITION_PENALTY,
-            skip_special_tokens=False,
-            stop=['</answer>'],
-            n=1  # Generate one continuation per prompt
-        )
-        self.first_full_ans = SamplingParams(
-            temperature=0.0,
-            max_tokens=5,#MAX_FIRST_ANS_TOKENS,
-            # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
-            # top_p=TOP_P,
-            # top_k=TOP_K,
-            # repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             stop=['</answer>'],
             n=1  # Generate one continuation per prompt
@@ -136,14 +113,6 @@ class TreeOfThoughts:
             'split': None,
             'last_chance':False
         }]
-        first_full_output = self.llm.generate([tree[0]['text']], self.first_full_ans)
-        first_full_completion = first_full_output[0].outputs[0]
-        if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
-            return tree, []
-        # completions = [output.outputs[0] for output in first_full_output]
-        # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
-
-
 
         current_depth = 0
         final_nodes = []
