@@ -21,6 +21,8 @@ END_OF_TEXT_ID_TOKEN = 151643
 UNIFIED_MAX_TOKENS = 512
 MAX_FIRST_ANS_TOKENS = 2048
 
+N_TOTAL_SPLITS = 4
+
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=24, max_depth=25):
         self.llm = llm
@@ -140,8 +142,32 @@ class TreeOfThoughts:
         first_full_completion = first_full_output[0].outputs[0]
         if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
             return tree, []
+        full_ans = first_full_completion.text
+        thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
+
+        if thoughts_count > N_TOTAL_SPLITS:
+            print('Found')
+            start_index = kth_occurrence_from_end(full_ans, THINK_END_TOKEN, N_TOTAL_SPLITS + 1)
+            tree[0]['text'] += full_ans[:start_index:]
+
+        print(tree[0]['text'] )
+        return tree, []
+
         # completions = [output.outputs[0] for output in first_full_output]
         # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -277,3 +303,15 @@ class TreeOfThoughts:
         else:
             json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
 
+
+def kth_occurrence_from_end(s, sub, k):
+    """
+    Returns the index of the k'th occurrence of `sub` in `s` from the end.
+    If the substring doesn't occur k times, returns -1.
+    """
+    pos = len(s)
+    for i in range(k):
+        pos = s.rfind(sub, 0, pos)
+        if pos == -1:
+            return -1
+    return pos
