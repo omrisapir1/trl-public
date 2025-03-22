@@ -63,12 +63,12 @@ class TreeOfThoughts:
         #     n=1  # Generate one continuation per prompt
         # )
         self.first_full_ans = SamplingParams(
-            temperature=0.0,
+            temperature=TEMPERATURE,
             max_tokens=MAX_FIRST_ANS_TOKENS,
             # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
-            # top_p=TOP_P,
-            # top_k=TOP_K,
-            # repetition_penalty=REPETITION_PENALTY,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             stop=['</answer>'],
             n=1  # Generate one continuation per prompt
