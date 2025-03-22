@@ -133,7 +133,7 @@ class TreeOfThoughts:
             'prompt': '',
             'parent_idx': None,
             'depth': 0,
-            'split': None,
+            'split': -1,
             'last_chance':False
         }]
         first_full_output = self.llm.generate([tree[0]['text']], self.first_full_ans)
