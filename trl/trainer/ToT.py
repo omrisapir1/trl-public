@@ -133,6 +133,7 @@ class TreeOfThoughts:
         first_full_output = self.llm.generate([tree[0]['text']], self.first_full_ans)
         first_full_completion = first_full_output[0].outputs[0]
         if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
+            print('SKIPPED')
             return tree, []
         full_ans = first_full_completion.text
         thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
