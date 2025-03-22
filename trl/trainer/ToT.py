@@ -153,6 +153,7 @@ class TreeOfThoughts:
             print('Not Found')
 
         print(tree[0]['text'] )
+        print('\n-----------\n')
         print(first_full_completion.text)
         return tree, []
 
