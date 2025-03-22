@@ -204,7 +204,7 @@ class TreeOfThoughts:
                             parent['last_chance'] = True
                         text = ' ' + text
                     else:
-
+                        parent['last_chance'] = False
                         stop_token = children_completion.stop_reason
                         text += stop_token
 
@@ -213,7 +213,7 @@ class TreeOfThoughts:
                             parent['to_stop'] = True
                         elif stop_token == ANSWER_START_TOKEN:
                             parent['next_split'] = LAST_SPLIT
-                    parent['last_chance'] = False
+
 
                     parent['completion_ids'] += children_completion.token_ids
 

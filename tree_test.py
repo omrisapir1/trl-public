@@ -1,3 +1,4 @@
+# !rm Data_in_training/*
 from datasets import load_dataset, Dataset
 import pandas as pd
 from trl import GRPOTrainer, GRPOConfig
