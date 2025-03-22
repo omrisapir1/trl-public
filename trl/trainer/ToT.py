@@ -26,7 +26,7 @@ N_TOTAL_SPLITS = 4
 LAST_SPLIT = 2
 
 class TreeOfThoughts:
-    def __init__(self, llm, max_split_depth=34, max_depth=12):
+    def __init__(self, llm, max_split_depth=34, max_depth=9):
         self.llm = llm
         self.max_depth = max_depth
         self.max_split_depth = max_split_depth
