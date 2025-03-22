@@ -151,6 +151,7 @@ class TreeOfThoughts:
             tree[0]['text'] += full_ans[:start_index:]
 
         print(tree[0]['text'] )
+        print(first_full_completion.text)
         return tree, []
 
         # completions = [output.outputs[0] for output in first_full_output]
