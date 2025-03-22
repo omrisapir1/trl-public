@@ -246,6 +246,7 @@ class TreeOfThoughts:
                         node['reward'] = 0
                         node['to_stop'] = True
                     elif children_completion.stop_reason == ANSWER_START_TOKEN:
+                        text += ANSWER_START_TOKEN
                         parent['next_split'] = LAST_SPLIT
 
                     node['text'] = text
