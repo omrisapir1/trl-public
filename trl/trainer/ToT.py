@@ -149,6 +149,8 @@ class TreeOfThoughts:
             print('Found')
             start_index = kth_occurrence_from_end(full_ans, THINK_END_TOKEN, N_TOTAL_SPLITS + 1)
             tree[0]['text'] += full_ans[:start_index:]
+        else:
+            print('Not Found')
 
         print(tree[0]['text'] )
         print(first_full_completion.text)
