@@ -26,7 +26,7 @@ N_TOTAL_SPLITS = 4
 LAST_SPLIT = 2
 
 class TreeOfThoughts:
-    def __init__(self, llm, max_split_depth=24, max_depth=25):
+    def __init__(self, llm, max_split_depth=34, max_depth=35):
         self.llm = llm
         self.max_depth = max_depth
         self.max_split_depth = max_split_depth
@@ -146,23 +146,12 @@ class TreeOfThoughts:
             return tree, []
         full_ans = first_full_completion.text
         thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
-        if thoughts_count!=4:
-            print('Not FOUND!!!')
-            return tree, []
 
         if thoughts_count > N_TOTAL_SPLITS:
-            print('Found')
             start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS) + len(THINK_BOTH_TOKEN)
             tree[0]['text'] += full_ans[:start_index]
-        else:
-            print('Not Found')
 
-        print(tree[0]['text'] )
-        print('\n-----------\n')
-        print(first_full_completion.text)
-        print(first_full_completion.text.count(THINK_BOTH_TOKEN))
-        print(tree[0]['text'].count(THINK_BOTH_TOKEN))
-        return tree, []
+
 
         # completions = [output.outputs[0] for output in first_full_output]
         # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
@@ -198,8 +187,14 @@ class TreeOfThoughts:
 
             # Generate all continuations in single batch
             if current_depth == self.max_split_depth:
+                print('SHOULD NOT BE HERE')
+                print(tree)
+                raise
                 outputs = self.llm.generate(batch_prompts, self.no_more_splits_sampling_params)
             elif current_depth == (self.max_depth-1):
+                print('SHOULD NOT BE HERE 2')
+                print(tree)
+                raise
                 outputs = self.llm.generate(batch_prompts, self.last_sampling_params)
             else:
                 outputs = self.llm.generate(batch_prompts, self.sampling_params)
