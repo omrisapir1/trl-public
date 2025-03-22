@@ -13,7 +13,7 @@ TOP_P = 1.0
 TOP_K = 50
 REPETITION_PENALTY = 1.0
 MODEL = 'omrisap/Qwen2.5-1.5B_30K_COT_SFT'
-THINK_TAG_START = '<think></think>'
+THINK_BOTH_TOKEN = '<think></think>'
 THINK_END_TOKEN = '</think>'
 ANSWER_END_TOKEN = '</answer>'
 END_OF_TEXT_ID_TOKEN = 151643
@@ -59,17 +59,17 @@ class TreeOfThoughts:
             stop=['</answer>'],
             n=1  # Generate one continuation per prompt
         )
-        self.no_more_splits_sampling_params = SamplingParams(
-            temperature=TEMPERATURE,
-            max_tokens=UNIFIED_MAX_TOKENS,
-            # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
-            top_p=TOP_P,
-            top_k=TOP_K,
-            repetition_penalty=REPETITION_PENALTY,
-            skip_special_tokens=False,
-            stop=['</answer>'],
-            n=1  # Generate one continuation per prompt
-        )
+        # self.no_more_splits_sampling_params = SamplingParams(
+        #     temperature=TEMPERATURE,
+        #     max_tokens=UNIFIED_MAX_TOKENS,
+        #     # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
+        #     top_p=TOP_P,
+        #     top_k=TOP_K,
+        #     repetition_penalty=REPETITION_PENALTY,
+        #     skip_special_tokens=False,
+        #     stop=['</answer>'],
+        #     n=1  # Generate one continuation per prompt
+        # )
         self.first_full_ans = SamplingParams(
             temperature=0.0,
             max_tokens=MAX_FIRST_ANS_TOKENS,
@@ -131,7 +131,7 @@ class TreeOfThoughts:
         # Tree structure: list of dictionaries with 'text' and 'parent_idx'
         problem_as_chat_prompt = self.preprocess_problem(problem)
         tree = [{
-            'text': problem_as_chat_prompt + THINK_TAG_START,
+            'text': problem_as_chat_prompt + THINK_BOTH_TOKEN,
             'prompt': '',
             'parent_idx': None,
             'depth': 0,
@@ -147,8 +147,8 @@ class TreeOfThoughts:
 
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
-            start_index = kth_occurrence_from_end(full_ans, THINK_END_TOKEN, N_TOTAL_SPLITS + 1)
-            tree[0]['text'] += full_ans[:start_index:]
+            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS) + len(THINK_BOTH_TOKEN)
+            tree[0]['text'] += full_ans[start_index:]
         else:
             print('Not Found')
 
