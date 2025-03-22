@@ -149,7 +149,7 @@ class TreeOfThoughts:
 
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
-            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+2) + len(THINK_BOTH_TOKEN)
+            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+1) + len(THINK_BOTH_TOKEN)
             tree[0]['text'] += full_ans[:start_index]
         else:
             print('Not Found')
@@ -294,7 +294,7 @@ class TreeOfThoughts:
                 n['reward'] = np.mean(rewards)
             else:
                 n['dont_calc_loss'] = True
-        if random.random() < 0.05:
+        if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
         else:
             json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
