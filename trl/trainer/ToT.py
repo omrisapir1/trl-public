@@ -145,11 +145,11 @@ class TreeOfThoughts:
         if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
             return tree, []
         full_ans = first_full_completion.text
-        thoughts_count = full_ans.count(THINK_END_TOKEN) + 2
+        thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
 
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
-            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+1) + len(THINK_BOTH_TOKEN)
+            start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS+2) + len(THINK_BOTH_TOKEN)
             tree[0]['text'] += full_ans[:start_index]
         else:
             print('Not Found')
