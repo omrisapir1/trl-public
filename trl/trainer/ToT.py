@@ -145,7 +145,7 @@ class TreeOfThoughts:
         if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
             return tree, []
         full_ans = first_full_completion.text
-        thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
+        thoughts_count = full_ans.count(THINK_END_TOKEN) + 2
 
         if thoughts_count > N_TOTAL_SPLITS:
             print('Found')
