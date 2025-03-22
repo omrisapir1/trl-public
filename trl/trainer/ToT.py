@@ -72,7 +72,7 @@ class TreeOfThoughts:
         )
         self.first_full_ans = SamplingParams(
             temperature=0.0,
-            max_tokens=5,#MAX_FIRST_ANS_TOKENS,
+            max_tokens=MAX_FIRST_ANS_TOKENS,
             # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
             # top_p=TOP_P,
             # top_k=TOP_K,
