@@ -146,7 +146,7 @@ class TreeOfThoughts:
             return tree, []
         full_ans = first_full_completion.text
         thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
-        if thoughts_count!=5:
+        if thoughts_count!=4:
             print('Not FOUND!!!')
             return tree, []
 
