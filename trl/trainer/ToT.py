@@ -157,6 +157,8 @@ class TreeOfThoughts:
         print(tree[0]['text'] )
         print('\n-----------\n')
         print(first_full_completion.text)
+        print(first_full_completion.text.count(THINK_BOTH_TOKEN))
+        print(tree[0]['text'].count(THINK_BOTH_TOKEN))
         return tree, []
 
         # completions = [output.outputs[0] for output in first_full_output]
