@@ -26,7 +26,7 @@ N_TOTAL_SPLITS = 4
 LAST_SPLIT = 2
 
 class TreeOfThoughts:
-    def __init__(self, llm, max_split_depth=34, max_depth=35):
+    def __init__(self, llm, max_split_depth=34, max_depth=8):
         self.llm = llm
         self.max_depth = max_depth
         self.max_split_depth = max_split_depth
@@ -44,16 +44,6 @@ class TreeOfThoughts:
         self.last_sampling_params = SamplingParams(
             temperature=TEMPERATURE,
             max_tokens=UNIFIED_MAX_TOKENS,#MAX_END_TOKENS,
-            top_p=TOP_P,
-            top_k=TOP_K,
-            repetition_penalty=REPETITION_PENALTY,
-            skip_special_tokens=False,
-            stop=['</answer>'],
-            n=1  # Generate one continuation per prompt
-        )
-        self.no_more_splits_sampling_params = SamplingParams(
-            temperature=TEMPERATURE,
-            max_tokens=UNIFIED_MAX_TOKENS,#(self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
             top_p=TOP_P,
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
@@ -186,12 +176,7 @@ class TreeOfThoughts:
                 split_mapping.append((idx, split_count))
 
             # Generate all continuations in single batch
-            if current_depth == self.max_split_depth:
-                print('SHOULD NOT BE HERE')
-                print(tree)
-                raise
-                outputs = self.llm.generate(batch_prompts, self.no_more_splits_sampling_params)
-            elif current_depth == (self.max_depth-1):
+            if current_depth == (self.max_depth-1):
                 print('SHOULD NOT BE HERE 2')
                 print(tree)
                 raise
