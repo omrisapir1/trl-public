@@ -177,9 +177,6 @@ class TreeOfThoughts:
 
             # Generate all continuations in single batch
             if current_depth == (self.max_depth-1):
-                print('SHOULD NOT BE HERE 2')
-                print(tree)
-                raise
                 outputs = self.llm.generate(batch_prompts, self.last_sampling_params)
             else:
                 outputs = self.llm.generate(batch_prompts, self.sampling_params)
