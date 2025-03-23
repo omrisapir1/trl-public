@@ -783,12 +783,12 @@ class GRPOTrainer(Trainer):
             child_rewards = [tree[ch_idx].get("reward", 0) for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
-            std_r = float(torch.tensor(child_rewards, device=device).float().std())
+            std_r = float(torch.tensor(child_rewards).float().std())
 
             advantages = []
             for r in child_rewards:
                 advantages.append((r - mean_r) / (std_r + 1e-9))
-            advantages = torch.tensor(advantages, device=device)
+            advantages = torch.tensor(advantages)
 
 
             child_nodes = tree[child_indices[0]:child_indices[-1]+1]
@@ -838,7 +838,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": ref_per_token_logps.to('cpu') if ref_per_token_logps is not None else None,
             }
             group_dicts.append(group_dict)
 
