@@ -291,7 +291,7 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs).to('cuda:0')
+            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)#.to('cuda:0')
         else:
             model_id = model.config._name_or_path
             if args.model_init_kwargs is not None:
@@ -510,11 +510,11 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.6,
+                        gpu_memory_utilization=0.2,
                         # dtype=self.args.vllm_dtype,
                         max_num_seqs=48,
                         dtype=torch.bfloat16,
-                        max_num_batched_tokens=48*2000,
+                        max_num_batched_tokens=48*512,
                         # trust_remote_code=True,
 
                         # tensor_parallel_size=2,
@@ -570,14 +570,14 @@ class GRPOTrainer(Trainer):
         self.model.add_model_tags(self._tag_names)
 
 
-        self.model.to('cuda:0')
+        # self.model.to('cuda:0')
         if args.sync_ref_model:
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
 
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
-        self.ref_model = self.ref_model.to('cuda:1')
+        # self.ref_model = self.ref_model.to('cuda:1')
 
 
 
@@ -850,7 +850,13 @@ class GRPOTrainer(Trainer):
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
-        per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
+        try:
+            per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
+
+        except:
+            print(input_ids)
+            raise
+
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
