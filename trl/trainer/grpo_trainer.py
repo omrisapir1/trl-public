@@ -855,8 +855,33 @@ class GRPOTrainer(Trainer):
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+
+        batch_size = input_ids.size(0)
+        max_chunk_size = 2
         try:
-            per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device), attention_mask.to(self.model.device), logits_to_keep)
+            if batch_size >= max_chunk_size:
+                outputs = []
+                # Process the batch in chunks along the first dimension
+                for i in range(0, batch_size, max_chunk_size):
+                    p_chunk = input_ids[i:i + max_chunk_size].to(self.ref_model.device)
+                    m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+
+                    sub_output = self._get_per_token_logps(
+                        self.ref_model,
+                        p_chunk,
+                        m_chunk,
+                        logits_to_keep
+                    )
+                    outputs.append(sub_output)
+                # Concatenate the outputs along the batch dimension
+                per_token_logps = torch.cat(outputs, dim=0)
+            else:
+                per_token_logps = self._get_per_token_logps(
+                    self.ref_model,
+                    input_ids.to(self.ref_model.device),
+                    attention_mask.to(self.ref_model.device),
+                    logits_to_keep
+                )
 
         except:
             print(input_ids)
