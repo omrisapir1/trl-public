@@ -838,7 +838,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps.to('cpu') if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": ref_per_token_logps.detach().cpu() if ref_per_token_logps is not None else None,
             }
             group_dicts.append(group_dict)
 
