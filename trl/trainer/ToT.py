@@ -278,7 +278,7 @@ class TreeOfThoughts:
                 n['reward'] = np.mean(rewards)
             else:
                 n['dont_calc_loss'] = True
-        if random.random() < 0.2:
+        if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
         else:
             json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
