@@ -863,11 +863,11 @@ class GRPOTrainer(Trainer):
                 outputs = []
                 # Process the batch in chunks along the first dimension
                 for i in range(0, batch_size, max_chunk_size):
-                    p_chunk = input_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                    m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+                    p_chunk = input_ids[i:i + max_chunk_size].to(self.model.device)
+                    m_chunk = attention_mask[i:i + max_chunk_size].to(self.model.device)
 
                     sub_output = self._get_per_token_logps(
-                        self.ref_model,
+                        model,
                         p_chunk,
                         m_chunk,
                         logits_to_keep
@@ -877,9 +877,9 @@ class GRPOTrainer(Trainer):
                 per_token_logps = torch.cat(outputs, dim=0)
             else:
                 per_token_logps = self._get_per_token_logps(
-                    self.ref_model,
-                    input_ids.to(self.ref_model.device),
-                    attention_mask.to(self.ref_model.device),
+                    model,
+                    input_ids.to(self.model.device),
+                    attention_mask.to(self.model.device),
                     logits_to_keep
                 )
 
