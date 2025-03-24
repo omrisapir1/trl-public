@@ -14,7 +14,7 @@ TOP_K = 50
 REPETITION_PENALTY = 1.0
 MODEL = 'omrisap/Qwen2.5-1.5B_30K_COT_SFT'
 THINK_END_TOKEN = '</think>'
-THINK_START_TOKEN = '</think>'
+THINK_START_TOKEN = '<think>'
 THINK_BOTH_TOKEN = '<think></think>'
 
 ANSWER_END_TOKEN = '</answer>'
