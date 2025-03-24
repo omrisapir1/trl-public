@@ -213,6 +213,10 @@ class TreeOfThoughts:
                             parent['reward'] = 0
                         else:
                             parent['last_chance'] = True
+                        stop_token = children_completion.stop_reason
+                        if stop_token:
+                            print(stop_token)
+                            raise
                         text = ' ' + text
                     else:
                         parent['last_chance'] = False
