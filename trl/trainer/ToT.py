@@ -248,7 +248,7 @@ class TreeOfThoughts:
                         node['to_stop'] = True
                     elif children_completion.stop_reason == ANSWER_START_TOKEN:
                         text += ANSWER_START_TOKEN
-                        parent['next_split'] = LAST_SPLIT
+                        node['next_split'] = LAST_SPLIT
 
                     node['text'] = text
                     tree.append(node)
