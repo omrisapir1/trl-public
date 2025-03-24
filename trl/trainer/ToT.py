@@ -158,6 +158,15 @@ class TreeOfThoughts:
             # Collect nodes to split and their split counts
             split_nodes = []
             for node, idx in zip(candidates, idxs):
+
+                if node['prompt'].count('<answer>') > 1:
+                    print('FOUND 1')
+                    print(node)
+                    print('-------')
+                    print(tree)
+                    raise
+
+
                 if current_depth == self.max_depth:
                     final_nodes.append((node['parent_idx'], 0))
                     continue
@@ -225,14 +234,12 @@ class TreeOfThoughts:
 
 
                     parent['text'] += text
-                    # parent['prompt'] += text
                     parent['depth'] += 1
                     continue
 
 
                 for children_completion, prompt_token_ids in zip(children_completions, prompts_token_ids):
                     node = {
-                        # 'orig_prompt':parent['prompt'] + parent['text'],
                         'prompt': parent['prompt'] + parent['text'],
                         'parent_idx': parent_idx,
                         'depth': current_depth + 1,
@@ -259,7 +266,12 @@ class TreeOfThoughts:
                     if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
                         node['reward'] = 0
                         node['to_stop'] = True
-
+                    if  node['prompt'].count('<answer>') >1:
+                        print('FOUND @@')
+                        print(node)
+                        print('-------')
+                        print(tree)
+                        raise
                     node['text'] = text
                     tree.append(node)
 
