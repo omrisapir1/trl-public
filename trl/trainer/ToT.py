@@ -210,7 +210,7 @@ class TreeOfThoughts:
 
                     children_completion = children_completions[0]
                     text = children_completion.text
-                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion} and parent is and {parent.get("predict_answer")} is and p_idx {parent_idx}'))
+                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion} and parent is and {parent.get("predict_answer")} is and p_idx {parent_idx}')
                     if children_completion.finish_reason == 'length' or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         if parent.get('last_chance') or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                             parent['to_stop'] = True
