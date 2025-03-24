@@ -151,6 +151,7 @@ class TreeOfThoughts:
 
         current_depth = 0
         final_nodes = []
+        logs = []
         while current_depth <= self.max_depth:
             # Get unsplit nodes at current depth
             candidates, idxs = zip(*[(n, i) for i, n in enumerate(tree) if n['depth'] == current_depth])
@@ -160,6 +161,7 @@ class TreeOfThoughts:
             for node, idx in zip(candidates, idxs):
 
                 if node['prompt'].count('<answer>') > 1:
+                    print(logs)
                     print('FOUND 1')
                     print(node)
                     print('-------')
@@ -205,8 +207,10 @@ class TreeOfThoughts:
                 prompts_token_ids = all_prompts_token_ids[comp_idx:comp_idx + split_count]
                 comp_idx += split_count
                 if split_count == 1:
+
                     children_completion = children_completions[0]
                     text = children_completion.text
+                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion}')
                     if children_completion.finish_reason == 'length' or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         if parent.get('last_chance') or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                             parent['to_stop'] = True
@@ -243,6 +247,7 @@ class TreeOfThoughts:
 
 
                 for children_completion, prompt_token_ids in zip(children_completions, prompts_token_ids):
+                    logs.append(f'adding node {len(tree)} this is childer_complition {children_completion}')
                     node = {
                         'prompt': parent['prompt'] + parent['text'],
                         'parent_idx': parent_idx,
@@ -272,6 +277,7 @@ class TreeOfThoughts:
                         node['to_stop'] = True
                     if  node['prompt'].count('<answer>') >1:
                         print('FOUND @@')
+                        print(logs)
                         print(node)
                         print('-------')
                         print(tree)
