@@ -225,19 +225,14 @@ class TreeOfThoughts:
 
 
                     parent['text'] += text
-                    parent['prompt'] += text
-                    print(parent['text'])
-                    print('-------------------')
-                    print(parent['prompt'])
-                    raise 
-
+                    # parent['prompt'] += text
                     parent['depth'] += 1
                     continue
 
 
                 for children_completion, prompt_token_ids in zip(children_completions, prompts_token_ids):
                     node = {
-                        'orig_prompt':parent['prompt'] + parent['text'],
+                        # 'orig_prompt':parent['prompt'] + parent['text'],
                         'prompt': parent['prompt'] + parent['text'],
                         'parent_idx': parent_idx,
                         'depth': current_depth + 1,
