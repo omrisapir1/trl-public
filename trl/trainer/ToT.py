@@ -214,7 +214,7 @@ class TreeOfThoughts:
                         else:
                             parent['last_chance'] = True
                         stop_token = children_completion.stop_reason
-                        if stop_token:
+                        if stop_token and not parent.get('to_stop'):
                             print(stop_token)
                             raise
                         text = ' ' + text
