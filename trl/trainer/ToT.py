@@ -240,9 +240,6 @@ class TreeOfThoughts:
                         'prompt_ids': prompt_token_ids,
                     }
                     text = children_completion.text
-                    if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
-                        node['reward'] = 0
-                        node['to_stop'] = True
                     if children_completion.finish_reason == 'length':
                         node['last_chance'] = True
                         text = ' ' + text
@@ -259,6 +256,9 @@ class TreeOfThoughts:
                         text += ANSWER_START_TOKEN
                         node['next_split'] = LAST_SPLIT
                         node['predict_answer'] = True
+                    if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
+                        node['reward'] = 0
+                        node['to_stop'] = True
 
                     node['text'] = text
                     tree.append(node)
