@@ -13,8 +13,10 @@ TOP_P = 1.0
 TOP_K = 50
 REPETITION_PENALTY = 1.0
 MODEL = 'omrisap/Qwen2.5-1.5B_30K_COT_SFT'
-THINK_BOTH_TOKEN = '<think></think>'
 THINK_END_TOKEN = '</think>'
+THINK_START_TOKEN = '</think>'
+THINK_BOTH_TOKEN = '<think></think>'
+
 ANSWER_END_TOKEN = '</answer>'
 ANSWER_START_TOKEN = '<answer>'
 END_OF_TEXT_ID_TOKEN = 151643
@@ -207,12 +209,19 @@ class TreeOfThoughts:
                         parent['last_chance'] = False
                         stop_token = children_completion.stop_reason
                         text += stop_token
-
                         if stop_token == ANSWER_END_TOKEN:
                             parent['reward'] = self.is_correct_solution(text, numerical_label)
                             parent['to_stop'] = True
+                        elif parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
+                            print('FOUND WRONG  in 1 split!!!')
+                            print(parent)
+                            print('--------')
+                            print(text)
+                            raise
+
                         elif stop_token == ANSWER_START_TOKEN:
                             parent['next_split'] = LAST_SPLIT
+                            parent['predict_answer'] = True
 
 
                     parent['completion_ids'] += children_completion.token_ids
@@ -234,6 +243,12 @@ class TreeOfThoughts:
                         'prompt_ids': prompt_token_ids,
                     }
                     text = children_completion.text
+                    if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
+                            print('FOUND WRONG  in 2 split!!!')
+                            print(parent)
+                            print('--------')
+                            print(text)
+                            raise
                     if children_completion.finish_reason == 'length':
                         node['last_chance'] = True
                         text = ' ' + text
@@ -249,6 +264,7 @@ class TreeOfThoughts:
                     elif children_completion.stop_reason == ANSWER_START_TOKEN:
                         text += ANSWER_START_TOKEN
                         node['next_split'] = LAST_SPLIT
+                        node['predict_answer'] = True
 
                     node['text'] = text
                     tree.append(node)
