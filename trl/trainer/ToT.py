@@ -259,6 +259,7 @@ class TreeOfThoughts:
                     text = children_completion.text
                     if children_completion.finish_reason == 'length':
                         node['last_chance'] = True
+                        node['predict_answer'] = parent.get('predict_answer')
                         text = ' ' + text
                     elif children_completion.stop_reason == THINK_END_TOKEN:
                         text += THINK_END_TOKEN
