@@ -226,6 +226,11 @@ class TreeOfThoughts:
 
                     parent['text'] += text
                     parent['prompt'] += text
+                    print(parent['text'])
+                    print('-------------------')
+                    print(parent['prompt'])
+                    raise 
+
                     parent['depth'] += 1
                     continue
 
