@@ -248,6 +248,8 @@ class TreeOfThoughts:
                             print(parent)
                             print('--------')
                             print(text)
+                            print('------')
+                            print(children_completion.stop_reason)
                             raise
                     if children_completion.finish_reason == 'length':
                         node['last_chance'] = True
