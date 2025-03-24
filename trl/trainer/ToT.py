@@ -70,7 +70,7 @@ class TreeOfThoughts:
             # top_k=TOP_K,
             # repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
-            stop=['</answer>'],
+            stop=['</answer>','<answer>'],
             n=1  # Generate one continuation per prompt
         )
 

@@ -6,7 +6,7 @@ import random
 
 
 df = pd.read_pickle('15K_TRPO_trainset.pkl')[['problem','numerical_solution']]
-df = df.iloc[:4590]
+df = df.iloc[:1320]
 hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 
 
