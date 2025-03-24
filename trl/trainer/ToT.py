@@ -210,7 +210,7 @@ class TreeOfThoughts:
 
                     children_completion = children_completions[0]
                     text = children_completion.text
-                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion}')
+                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion} and parent is and {parent.get("predict_answer")} is and p_idx {parent_idx}'))
                     if children_completion.finish_reason == 'length' or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         if parent.get('last_chance') or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                             parent['to_stop'] = True
@@ -247,7 +247,8 @@ class TreeOfThoughts:
 
 
                 for children_completion, prompt_token_ids in zip(children_completions, prompts_token_ids):
-                    logs.append(f'adding node {len(tree)} this is childer_complition {children_completion}')
+                    logs.append(f'adding node {len(tree)} this is childer_complition {children_completion} and {parent.get("predict_answer")} and parent idx'
+                                f' is and p_idx {parent_idx}')
                     node = {
                         'prompt': parent['prompt'] + parent['text'],
                         'parent_idx': parent_idx,
