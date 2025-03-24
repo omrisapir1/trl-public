@@ -209,15 +209,12 @@ class TreeOfThoughts:
                         parent['last_chance'] = False
                         stop_token = children_completion.stop_reason
                         text += stop_token
-                        if stop_token == ANSWER_END_TOKEN:
+                        if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
+                            parent['reward'] = 0
+                            parent['to_stop'] = True
+                        elif stop_token == ANSWER_END_TOKEN:
                             parent['reward'] = self.is_correct_solution(text, numerical_label)
                             parent['to_stop'] = True
-                        elif parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
-                            print('FOUND WRONG  in 1 split!!!')
-                            print(parent)
-                            print('--------')
-                            print(text)
-                            raise
 
                         elif stop_token == ANSWER_START_TOKEN:
                             parent['next_split'] = LAST_SPLIT
@@ -244,13 +241,8 @@ class TreeOfThoughts:
                     }
                     text = children_completion.text
                     if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
-                            print('FOUND WRONG  in 2 split!!!')
-                            print(parent)
-                            print('--------')
-                            print(text)
-                            print('------')
-                            print(children_completion.stop_reason)
-                            raise
+                            parent['reward'] = 0
+                            parent['to_stop'] = True
                     if children_completion.finish_reason == 'length':
                         node['last_chance'] = True
                         text = ' ' + text
