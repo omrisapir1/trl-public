@@ -746,11 +746,11 @@ class GRPOTrainer(Trainer):
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
-        tree, final_nodes = self.tree_of_thoughts.generate_tree(
+        tree, final_nodes, logs = self.tree_of_thoughts.generate_tree(
             problem=inputs[0]['problem'],
             numerical_label=inputs[0]['numerical_solution']
         )
-        self.tree_of_thoughts.evaluate_tree(tree, final_nodes)
+        self.tree_of_thoughts.evaluate_tree(tree, final_nodes, logs)
 
         # -----------------------------------------------------
         # 3) Identify valid nodes that form a "group"

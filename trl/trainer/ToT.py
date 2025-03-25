@@ -159,6 +159,7 @@ class TreeOfThoughts:
         current_depth = 0
         final_nodes = []
         logs = []
+        counter_max_depth, counter_not_max_depth = 0, 0
         while current_depth <= self.max_depth:
             # Get unsplit nodes at current depth
             candidates, idxs = zip(*[(n, i) for i, n in enumerate(tree) if n['depth'] == current_depth])
@@ -167,16 +168,10 @@ class TreeOfThoughts:
             split_nodes = []
             for node, idx in zip(candidates, idxs):
 
-                if node['prompt'].count('<answer>') > 1:
-                    print(logs)
-                    print('FOUND 1')
-                    print(node)
-                    print('-------')
-                    print(tree)
-                    raise
-
 
                 if current_depth == self.max_depth:
+                    counter_max_depth += 1
+                    logs.append(f'ADDed in MAX depth {counter_max_depth} and idx is {idx}')
                     final_nodes.append((node['parent_idx'], 0))
                     continue
                 split_count = self.decide_split(node)
@@ -184,6 +179,7 @@ class TreeOfThoughts:
                 if split_count:
                     split_nodes.append((node, split_count, idx))
                 else:
+                    logs.append(f'ADDed not in max depth {counter_not_max_depth} and idx is {idx}')
                     final_nodes.append((node['parent_idx'], node['reward']))
 
             if not split_nodes:
@@ -217,7 +213,7 @@ class TreeOfThoughts:
 
                     children_completion = children_completions[0]
                     text = children_completion.text
-                    logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion} and parent is and {parent.get("predict_answer")} is and p_idx {parent_idx}')
+
                     if children_completion.finish_reason == 'length' or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         if parent.get('last_chance') or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                             parent['to_stop'] = True
@@ -254,8 +250,7 @@ class TreeOfThoughts:
 
 
                 for children_completion, prompt_token_ids in zip(children_completions, prompts_token_ids):
-                    logs.append(f'adding node {len(tree)} this is childer_complition {children_completion} and {parent.get("predict_answer")} and parent idx'
-                                f' is and p_idx {parent_idx}')
+
                     node = {
                         'prompt': parent['prompt'] + parent['text'],
                         'parent_idx': parent_idx,
@@ -285,19 +280,12 @@ class TreeOfThoughts:
                     if parent.get('predict_answer') and any(t in text for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_START_TOKEN]):
                         node['reward'] = 0
                         node['to_stop'] = True
-                    if  node['prompt'].count('<answer>') >1:
-                        print('FOUND @@')
-                        print(logs)
-                        print(node)
-                        print('-------')
-                        print(tree)
-                        raise
                     node['text'] = text
                     tree.append(node)
 
             current_depth += 1
 
-        return tree, final_nodes
+        return tree, final_nodes, logs
 
     def propogate_reward(self, node_idx, reward, tree):
         node = tree[node_idx]
@@ -313,7 +301,13 @@ class TreeOfThoughts:
     def evaluate_tree(self, tree, final_nodes):
         for node in final_nodes:
             self.propogate_reward(node[0], node[1], tree)
-        assert len(final_nodes) == len([n for n in tree if n.get('reward',-111) >=0])
+        try:
+            assert sorted([n['reward'] for n in tree if n.get('reward',-111) >=0 and not n.get('rewards')]) == sorted(tree[0]['rewards'])
+        except:
+            print(logs)
+            print(tree)
+            raise
+
         for n in tree:
             rewards = n.get('rewards',[1])
             std = np.std(rewards)
