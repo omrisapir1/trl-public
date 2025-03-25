@@ -298,7 +298,7 @@ class TreeOfThoughts:
 
 
 
-    def evaluate_tree(self, tree, final_nodes):
+    def evaluate_tree(self, tree, final_nodes, logs):
         for node in final_nodes:
             self.propogate_reward(node[0], node[1], tree)
         try:
