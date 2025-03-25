@@ -313,6 +313,7 @@ class TreeOfThoughts:
     def evaluate_tree(self, tree, final_nodes):
         for node in final_nodes:
             self.propogate_reward(node[0], node[1], tree)
+        assert len(final_nodes) == len([n for n in tree if n.get('reward',-111) >0])
         for n in tree:
             rewards = n.get('rewards',[1])
             std = np.std(rewards)
@@ -320,6 +321,7 @@ class TreeOfThoughts:
                 n['reward'] = np.mean(rewards)
             else:
                 n['dont_calc_loss'] = True
+
         if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
         else:
