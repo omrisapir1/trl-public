@@ -19,7 +19,7 @@ THINK_BOTH_TOKEN = '<think></think>'
 
 ANSWER_END_TOKEN = '</answer>'
 ANSWER_START_TOKEN = '<answer>'
-END_OF_TEXT_ID_TOKEN = 151643
+END_OF_TEXT_ID_TOKENS = {151643, 151645}
 
 UNIFIED_MAX_TOKENS = 512
 MAX_FIRST_ANS_TOKENS = 2048
@@ -134,7 +134,7 @@ class TreeOfThoughts:
         }]
         first_full_output = self.llm.generate([tree[0]['text']], self.first_full_ans)
         first_full_completion = first_full_output[0].outputs[0]
-        if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
+        if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason in END_OF_TEXT_ID_TOKENS or first_full_completion.stop_reason is None:
             print('SKIPPED')
             return tree, []
         full_ans = first_full_completion.text
@@ -211,8 +211,8 @@ class TreeOfThoughts:
                     children_completion = children_completions[0]
                     text = children_completion.text
                     logs.append(f'workind on parnt {parent_idx} this is childer_complition {children_completion} and parent is and {parent.get("predict_answer")} is and p_idx {parent_idx}')
-                    if children_completion.finish_reason == 'length' or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
-                        if parent.get('last_chance') or children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
+                    if children_completion.finish_reason == 'length' or children_completion.stop_reason in END_OF_TEXT_ID_TOKENS or children_completion.stop_reason is None:
+                        if parent.get('last_chance') or children_completion.stop_reason in END_OF_TEXT_ID_TOKENS or children_completion.stop_reason is None:
                             parent['to_stop'] = True
                             parent['reward'] = 0
                         else:
@@ -267,7 +267,7 @@ class TreeOfThoughts:
                         text += ANSWER_END_TOKEN
                         node['reward'] = self.is_correct_solution(text, numerical_label)
                         node['to_stop'] = True
-                    elif children_completion.stop_reason == END_OF_TEXT_ID_TOKEN:
+                    elif children_completion.stop_reason in END_OF_TEXT_ID_TOKENS:
                         node['reward'] = 0
                         node['to_stop'] = True
                         node['predict_answer'] = parent.get('predict_answer')
