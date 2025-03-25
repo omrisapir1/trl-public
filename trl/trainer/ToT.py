@@ -26,6 +26,8 @@ MAX_FIRST_ANS_TOKENS = 2048
 
 N_TOTAL_SPLITS = 4
 LAST_SPLIT = 2
+CORRECT_STRUCTURE_REWARD = 0.1
+CORRECT_FLOAT_REWARD = 0.1
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=34, max_depth=9):
@@ -78,15 +80,20 @@ class TreeOfThoughts:
 
     def is_correct_solution(self,answer, numerical_label):
         """Extract the last numerical answer enclosed in \boxed{}"""
+        total_reward = 0
         matches = re.findall(r'\\boxed\{([^}]*)\}', answer)
         if matches:
             extracted_answer = re.sub(r'[^0-9.-]', '', matches[-1]).strip()
             if extracted_answer.replace('.', '', 1).replace('-','',1).isdigit():
+
                 try:
-                    return int(float(extracted_answer) == float(numerical_label))
+                    extracted_answer = float(extracted_answer)
+                    total_reward += CORRECT_FLOAT_REWARD
+                    total_reward += int(float(extracted_answer) == float(numerical_label))
+                    return total_reward
                 except ValueError:
-                    return 0
-        return 0
+                    return total_reward
+        return total_reward
 
     def preprocess_problem(self, problem):
         # Ensure the contents are strings
@@ -230,7 +237,7 @@ class TreeOfThoughts:
                             parent['reward'] = 0
                             parent['to_stop'] = True
                         elif stop_token == ANSWER_END_TOKEN:
-                            parent['reward'] = self.is_correct_solution(text, numerical_label)
+                            parent['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
                             parent['to_stop'] = True
 
                         elif stop_token == ANSWER_START_TOKEN:
@@ -265,7 +272,7 @@ class TreeOfThoughts:
                         text += THINK_END_TOKEN
                     elif children_completion.stop_reason == ANSWER_END_TOKEN:
                         text += ANSWER_END_TOKEN
-                        node['reward'] = self.is_correct_solution(text, numerical_label)
+                        node['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
                         node['to_stop'] = True
                     elif children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         node['reward'] = 0

@@ -513,7 +513,7 @@ class GRPOTrainer(Trainer):
                         gpu_memory_utilization=0.2,
                         # dtype=self.args.vllm_dtype,
                         max_num_seqs=48,
-                        dtype=torch.bfloat16,
+                        
                         max_num_batched_tokens=48*1048,
                         # trust_remote_code=True,
 
