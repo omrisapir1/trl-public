@@ -172,7 +172,7 @@ class TreeOfThoughts:
                 if current_depth == self.max_depth:
                     counter_max_depth += 1
                     logs.append(f'ADDed in MAX depth {counter_max_depth} and idx is {idx}')
-                    final_nodes.append((node['parent_idx'], 0))
+                    final_nodes.append((node['parent_idx'], node['reward']))
                     continue
                 split_count = self.decide_split(node)
                 node['split'] = split_count
