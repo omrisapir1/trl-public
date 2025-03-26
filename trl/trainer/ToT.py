@@ -22,12 +22,13 @@ ANSWER_START_TOKEN = '<answer>'
 END_OF_TEXT_ID_TOKEN = 151643
 
 UNIFIED_MAX_TOKENS = 512
-MAX_FIRST_ANS_TOKENS = 2048
+MAX_FIRST_ANS_TOKENS = 2548
 
 N_TOTAL_SPLITS = 2
 LAST_SPLIT = 4
 CORRECT_STRUCTURE_REWARD = 0.1
 CORRECT_FLOAT_REWARD = 0.1
+FIRST_SPLIT_COUNT = 4
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=34, max_depth=9):
@@ -67,14 +68,14 @@ class TreeOfThoughts:
         #     n=1  # Generate one continuation per prompt
         # )
         self.first_full_ans = SamplingParams(
-            temperature=0.0,
+            temperature=TEMPERATURE,
             max_tokens=MAX_FIRST_ANS_TOKENS,
             # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
-            # top_p=TOP_P,
-            # top_k=TOP_K,
-            # repetition_penalty=REPETITION_PENALTY,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
-            stop=['</answer>','<answer>'],
+            stop=['<answer>'],
             n=1  # Generate one continuation per prompt
         )
 
@@ -118,8 +119,8 @@ class TreeOfThoughts:
             return 1
         elif node.get('next_split'):
             return node['next_split']
-        if node['depth'] == 0:
-            return 4
+        # if node['depth'] == 0:
+        #     return 4
         # elif node['depth'] == 1:
         #     return 2
         # elif node['depth'] == 2:
@@ -143,25 +144,51 @@ class TreeOfThoughts:
             'split': -1,
             'last_chance':False
         }]
-        # first_full_output = self.llm.generate([tree[0]['text']], self.first_full_ans)
-        # first_full_completion = first_full_output[0].outputs[0]
-        # if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None:
-        #     print('SKIPPED')
-        #     return tree, []
-        # full_ans = first_full_completion.text
-        # thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
-        #
-        # if thoughts_count > N_TOTAL_SPLITS:
-        #     start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS) + len(THINK_BOTH_TOKEN)
-        #     tree[0]['text'] += full_ans[:start_index]
+
+        final_nodes = []
+
+        first_full_outputs = self.llm.generate([tree[0]['text']] * FIRST_SPLIT_COUNT, self.first_full_ans)
+        any_valid_end = False
+        for first_full_output in first_full_outputs:
+            first_full_completion = first_full_output[0].outputs[0]
+            full_ans = first_full_completion.text
+
+            node = {'prompt': tree[0]['prompt'],
+                    'parent_idx': 0,
+                    'last_chance': False,
+                    'depth': 1,
+                    'split': FIRST_SPLIT_COUNT,
+                    'text': full_ans,
+                    'predict_answer': True,
+                    }
+
+            if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
+                node['reward'] = 0
+                node['to_stop'] = True
+                final_nodes.append(0, node['reward'])
+                print('1 Down')
+
+            else:
+                any_valid_end = True
+            tree.append(node)
+            #
+            #
+            # thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
+            #
+            # if thoughts_count > N_TOTAL_SPLITS:
+            #     start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, N_TOTAL_SPLITS) + len(THINK_BOTH_TOKEN)
+            #     tree[0]['text'] += full_ans[:start_index]
+
 
 
 
         # completions = [output.outputs[0] for output in first_full_output]
         # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
+        if not any_valid_end:
+            print('Didnt found any valid end of text')
+            return tree, []
+        current_depth = 1
 
-        current_depth = 0
-        final_nodes = []
         logs = []
         counter_max_depth, counter_not_max_depth = 0, 0
         while current_depth <= self.max_depth:
