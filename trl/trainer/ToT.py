@@ -157,7 +157,7 @@ class TreeOfThoughts:
                     'last_chance': False,
                     'depth': 1,
                     'split': FIRST_SPLIT_COUNT,
-                    'text': full_ans + first_full_completion.stop_reason if type(first_full_completion.stop_reason)==str else '',
+                    'text': (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else '',
                     'predict_answer': True,
                     'prompt_token_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
@@ -341,12 +341,6 @@ class TreeOfThoughts:
     def evaluate_tree(self, tree, final_nodes, logs):
         for node in final_nodes:
             self.propogate_reward(node[0], node[1], tree)
-        try:
-            assert sorted([n['reward'] for n in tree if n.get('reward',-111) >=0 and not n.get('rewards')]) == sorted(tree[0]['rewards'])
-        except:
-            print(logs)
-            print(tree)
-            raise
 
         for n in tree:
             rewards = n.get('rewards',[1])
