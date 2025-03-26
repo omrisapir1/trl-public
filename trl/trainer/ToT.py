@@ -153,7 +153,7 @@ class TreeOfThoughts:
             first_full_completion = first_full_output.outputs[0]
             full_ans = first_full_completion.text
 
-            node = {'prompt': tree[0]['prompt'],
+            node = {'prompt': tree[0]['text'],
                     'parent_idx': 0,
                     'last_chance': False,
                     'depth': 1,
