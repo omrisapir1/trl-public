@@ -160,6 +160,8 @@ class TreeOfThoughts:
                     'split': FIRST_SPLIT_COUNT,
                     'text': full_ans,
                     'predict_answer': True,
+                    'prompt_token_ids': first_full_output.prompt_token_ids,
+                    'completion_ids': full_ans.token_ids,
                     }
 
             if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
