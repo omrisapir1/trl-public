@@ -150,7 +150,7 @@ class TreeOfThoughts:
         first_full_outputs = self.llm.generate([tree[0]['text']] * FIRST_SPLIT_COUNT, self.first_full_ans)
         any_valid_end = False
         for first_full_output in first_full_outputs:
-            first_full_completion = first_full_output[0].outputs[0]
+            first_full_completion = first_full_output.outputs[0]
             full_ans = first_full_completion.text
 
             node = {'prompt': tree[0]['prompt'],
