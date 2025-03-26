@@ -158,7 +158,7 @@ class TreeOfThoughts:
                     'last_chance': False,
                     'depth': 1,
                     'split': FIRST_SPLIT_COUNT,
-                    'text': full_ans,
+                    'text': full_ans + first_full_completion.stop_reason,
                     'predict_answer': True,
                     'prompt_token_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
@@ -190,7 +190,7 @@ class TreeOfThoughts:
             print('Didnt found any valid end of text')
             return tree, []
         current_depth = 1
-
+        print(len(tree))
         logs = []
         counter_max_depth, counter_not_max_depth = 0, 0
         while current_depth <= self.max_depth:
