@@ -162,6 +162,7 @@ class TreeOfThoughts:
                     'predict_answer': True,
                     'prompt_token_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
+                    'next_split':LAST_SPLIT,
                     }
 
             if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
@@ -190,7 +191,7 @@ class TreeOfThoughts:
             print('Didnt found any valid end of text')
             return tree, []
         current_depth = 1
-        print(len(tree))
+
         logs = []
         counter_max_depth, counter_not_max_depth = 0, 0
         while current_depth <= self.max_depth:
@@ -324,7 +325,7 @@ class TreeOfThoughts:
                     tree.append(node)
 
             current_depth += 1
-        raise
+
         return tree, final_nodes, logs
 
     def propogate_reward(self, node_idx, reward, tree):
@@ -358,6 +359,7 @@ class TreeOfThoughts:
 
         if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
+            raise
         else:
             json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
 
