@@ -24,8 +24,8 @@ END_OF_TEXT_ID_TOKEN = 151643
 UNIFIED_MAX_TOKENS = 512
 MAX_FIRST_ANS_TOKENS = 2048
 
-N_TOTAL_SPLITS = 7
-LAST_SPLIT = 2
+N_TOTAL_SPLITS = 2
+LAST_SPLIT = 4
 CORRECT_STRUCTURE_REWARD = 0.1
 CORRECT_FLOAT_REWARD = 0.1
 
@@ -119,15 +119,15 @@ class TreeOfThoughts:
         elif node.get('next_split'):
             return node['next_split']
         if node['depth'] == 0:
-            return 2
-        elif node['depth'] == 1:
-            return 2
-        elif node['depth'] == 2:
-            return 2
-        elif node['depth'] == 3:
-            return 2
-        elif node['depth'] == 4:
-            return 2
+            return 4
+        # elif node['depth'] == 1:
+        #     return 2
+        # elif node['depth'] == 2:
+        #     return 2
+        # elif node['depth'] == 3:
+        #     return 2
+        # elif node['depth'] == 4:
+        #     return 2
         return 1
 
 
