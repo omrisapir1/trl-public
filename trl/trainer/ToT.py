@@ -158,7 +158,7 @@ class TreeOfThoughts:
                     'last_chance': False,
                     'depth': 1,
                     'split': FIRST_SPLIT_COUNT,
-                    'text': full_ans + first_full_completion.stop_reason,
+                    'text': full_ans + first_full_completion.stop_reason or '',
                     'predict_answer': True,
                     'prompt_token_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
@@ -359,7 +359,7 @@ class TreeOfThoughts:
 
         if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
-            raise
+            
         else:
             json.dump([{'rewards':t.get('rewards'), 'reward':t.get('reward'), 'parent_idx':t.get('parent_idx')} for t in tree], open(f'/workspace/Data_in_training/{time.time()}', 'w'))
 
