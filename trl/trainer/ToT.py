@@ -188,7 +188,7 @@ class TreeOfThoughts:
         # all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
         if not any_valid_end:
             print('Didnt found any valid end of text')
-            return tree, []
+            return tree, [], []
         current_depth = 1
 
         logs = []
