@@ -209,6 +209,7 @@ class TreeOfThoughts:
                     continue
                 split_count = self.decide_split(node)
                 node['split'] = split_count
+                print(split_count)
                 if split_count:
                     split_nodes.append((node, split_count, idx))
                 else:
@@ -323,7 +324,7 @@ class TreeOfThoughts:
                     tree.append(node)
 
             current_depth += 1
-
+        raise
         return tree, final_nodes, logs
 
     def propogate_reward(self, node_idx, reward, tree):
