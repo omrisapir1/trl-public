@@ -152,13 +152,12 @@ class TreeOfThoughts:
         for first_full_output in first_full_outputs:
             first_full_completion = first_full_output.outputs[0]
             full_ans = first_full_completion.text
-
             node = {'prompt': tree[0]['text'],
                     'parent_idx': 0,
                     'last_chance': False,
                     'depth': 1,
                     'split': FIRST_SPLIT_COUNT,
-                    'text': full_ans + first_full_completion.stop_reason or '',
+                    'text': full_ans + first_full_completion.stop_reason if type(first_full_completion.stop_reason)==str else '',
                     'predict_answer': True,
                     'prompt_token_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
@@ -210,7 +209,7 @@ class TreeOfThoughts:
                     continue
                 split_count = self.decide_split(node)
                 node['split'] = split_count
-                
+
                 if split_count:
                     split_nodes.append((node, split_count, idx))
                 else:
