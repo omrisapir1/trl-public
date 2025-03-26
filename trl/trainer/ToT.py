@@ -237,7 +237,10 @@ class TreeOfThoughts:
                             parent['reward'] = 0
                             parent['to_stop'] = True
                         elif stop_token == ANSWER_END_TOKEN:
-                            parent['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
+                            if ANSWER_START_TOKEN in text or ANSWER_START_TOKEN in parent['prompt'] or ANSWER_START_TOKEN in parent['text']:
+                                parent['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
+                            else:
+                                parent['reward'] = 0
                             parent['to_stop'] = True
 
                         elif stop_token == ANSWER_START_TOKEN:
@@ -271,7 +274,10 @@ class TreeOfThoughts:
                         text += THINK_END_TOKEN
                     elif children_completion.stop_reason == ANSWER_END_TOKEN:
                         text += ANSWER_END_TOKEN
-                        node['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
+                        if ANSWER_START_TOKEN in text or ANSWER_START_TOKEN in node['prompt']:
+                            node['reward'] = self.is_correct_solution(text, numerical_label) + CORRECT_STRUCTURE_REWARD
+                        else:
+                            node['reward'] = 0
                         node['to_stop'] = True
                     elif children_completion.stop_reason == END_OF_TEXT_ID_TOKEN or children_completion.stop_reason is None:
                         node['reward'] = 0
