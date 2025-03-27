@@ -164,7 +164,7 @@ class TreeOfThoughts:
                     'next_split':LAST_SPLIT,
                     }
 
-            if any(t in full_ans for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_END_TOKEN]) or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
+            if ANSWER_END_TOKEN in full_ans or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
                 node['reward'] = 0
                 node['to_stop'] = True
                 final_nodes.append((0, node['reward']))
