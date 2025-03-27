@@ -383,9 +383,9 @@ class TreeOfThoughts:
         for n in tree:
             reward = n.get('reward')
             if reward is not None:
-                n['reward'] = reward
+                n['reward'] = reward*0.5
             else:
-                n['reward'] = np.mean(n['rewards'])
+                n['reward'] = np.mean(n['rewards'])*0.5
 
 
         if random.random() < 1:
