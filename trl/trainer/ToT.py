@@ -341,6 +341,17 @@ class TreeOfThoughts:
     def evaluate_tree(self, tree, final_nodes, logs):
         for node in final_nodes:
             self.propogate_reward(node[0], node[1], tree)
+        try:
+            final_nodes_rewards = [n['reward'] for n in tree if n.get('reward', -111) >= 0 and not n.get('rewards')]
+            depth_1_rewards = []
+            for n in tree:
+                if n['depth'] == 1:
+                    depth_1_rewards.extend(n['rewards'])
+            assert sorted(depth_1_rewards) == sorted(final_nodes_rewards)
+        except:
+            print(logs)
+            print(tree)
+            raise
 
         for n in tree:
             reward = n.get('reward')
