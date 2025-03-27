@@ -159,7 +159,7 @@ class TreeOfThoughts:
                     'split': FIRST_SPLIT_COUNT,
                     'text': (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else '',
                     'predict_answer': True,
-                    'prompt_token_ids': first_full_output.prompt_token_ids,
+                    'prompt_ids': first_full_output.prompt_token_ids,
                     'completion_ids': first_full_completion.token_ids,
                     'next_split':LAST_SPLIT,
                     }
