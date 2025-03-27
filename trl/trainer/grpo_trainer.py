@@ -291,7 +291,7 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs).to(dtype=torch.bfloat16)#.to('cuda:0')
+            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)#.to('cuda:0')
         else:
             model_id = model.config._name_or_path
             if args.model_init_kwargs is not None:
@@ -511,7 +511,7 @@ class GRPOTrainer(Trainer):
                         # tensor_parallel_size=2,
                         device=vllm_device,
                         gpu_memory_utilization=0.5,
-                        dtype=torch.bfloat16,
+                        # dtype=torch.bfloat16,
                         max_num_seqs=16,
 
                         max_num_batched_tokens=48*1048,
