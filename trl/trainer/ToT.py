@@ -24,11 +24,13 @@ END_OF_TEXT_ID_TOKEN = 151643
 UNIFIED_MAX_TOKENS = 512
 MAX_FIRST_ANS_TOKENS = 2548
 
-N_TOTAL_SPLITS = 2
+
 LAST_SPLIT = 4
 CORRECT_STRUCTURE_REWARD = 0.1
 CORRECT_FLOAT_REWARD = 0.1
 FIRST_SPLIT_COUNT = 4
+MIN_THINK_TAG_SPLIT = 2
+
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=34, max_depth=9):
@@ -67,7 +69,7 @@ class TreeOfThoughts:
         #     stop=['</answer>'],
         #     n=1  # Generate one continuation per prompt
         # )
-        self.first_full_ans = SamplingParams(
+        self.generate_ans = SamplingParams(
             temperature=TEMPERATURE,
             max_tokens=MAX_FIRST_ANS_TOKENS,
             # (self.max_depth - self.max_split_depth) * MAX_THINK_TOKENS + MAX_END_TOKENS,
@@ -143,37 +145,60 @@ class TreeOfThoughts:
             'depth': 0,
             'split': -1,
             'last_chance':False,
-            'rewards':-1,
+            'reward':-1
         }]
 
         final_nodes = []
 
-        first_full_outputs = self.llm.generate([tree[0]['text']] * FIRST_SPLIT_COUNT, self.first_full_ans)
+        first_full_outputs = self.llm.generate([tree[0]['text']] * FIRST_SPLIT_COUNT, self.generate_ans)
         any_valid_end = False
         for first_full_output in first_full_outputs:
             first_full_completion = first_full_output.outputs[0]
             full_ans = first_full_completion.text
+
             node = {'prompt': tree[0]['text'],
                     'parent_idx': 0,
                     'last_chance': False,
                     'depth': 1,
                     'split': FIRST_SPLIT_COUNT,
-                    'text': (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else '',
-                    'predict_answer': True,
+                    'predict_answer':False,
+
                     'prompt_ids': first_full_output.prompt_token_ids,
-                    'completion_ids': first_full_completion.token_ids,
+
                     'next_split':LAST_SPLIT,
                     }
+
 
             if ANSWER_END_TOKEN in full_ans or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
                 node['reward'] = 0
                 node['to_stop'] = True
                 final_nodes.append((0, node['reward']))
                 print('1 Down')
+                node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else ''
+                node['completion_ids'] = first_full_completion.token_ids
+
 
             else:
                 any_valid_end = True
+                thoughts_count = full_ans.count(THINK_END_TOKEN)
+                node['next_split'] = LAST_SPLIT
+
+                if thoughts_count > 1:
+
+                    thought_index = min(int(thoughts_count/2), MIN_THINK_TAG_SPLIT)
+                    start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, thought_index) + len(THINK_BOTH_TOKEN)
+                    text = full_ans[:start_index]
+                    node['text'] = text
+                    node['completion_ids'] = self.tokenizer.encode(text)
+
+                else:
+                    node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason) == str else ''
+                    node['completion_ids'] = first_full_completion.token_ids
+                    node['predict_answer'] = True
+
+
             tree.append(node)
+
             #
             #
             # thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
