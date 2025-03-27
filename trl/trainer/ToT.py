@@ -256,7 +256,7 @@ class TreeOfThoughts:
             if current_depth == (self.max_depth-1):
                 outputs = self.llm.generate(batch_prompts, self.last_sampling_params)
             else:
-                outputs = self.llm.generate(batch_prompts, self.sampling_params)
+                outputs = self.llm.generate(batch_prompts, self.generate_ans)
             completions = [output.outputs[0] for output in outputs]
             all_prompts_token_ids = [output.prompt_token_ids for output in outputs]
 
