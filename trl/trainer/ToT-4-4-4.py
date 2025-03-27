@@ -175,6 +175,7 @@ class TreeOfThoughts:
                 final_nodes.append((0, node['reward']))
                 print('1 Down')
                 node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else ''
+                node['completion_ids'] = first_full_completion.token_ids
 
 
             else:
