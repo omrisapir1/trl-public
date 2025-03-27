@@ -510,9 +510,9 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.5,
+                        gpu_memory_utilization=0.3,
                         # dtype=torch.bfloat16,
-                        max_num_seqs=16,
+                        max_num_seqs=64,
 
                         max_num_batched_tokens=48*1048,
                         # trust_remote_code=True,
