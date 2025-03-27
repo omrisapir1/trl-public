@@ -510,9 +510,9 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.2,
-                        # dtype=self.args.vllm_dtype,
-                        max_num_seqs=48,
+                        gpu_memory_utilization=0.3,
+                        dtype=torch.bfloat16,
+                        max_num_seqs=16,
 
                         max_num_batched_tokens=48*1048,
                         # trust_remote_code=True,
@@ -745,19 +745,10 @@ class GRPOTrainer(Trainer):
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
 
-        import torch
-
-        def is_model_bfloat16(model):
-            for param in model.parameters():
-                print(param.dtype)
-                if param.dtype != torch.bfloat16:
-                    return False
-            return True
 
         # Usage
         # model = torch.load("your_model.pth") or model = YourModel(); model.load_state_dict(...)
-        print(is_model_bfloat16(self.model_wrapped))
-        print(is_model_bfloat16(self.ref_model))
+
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
