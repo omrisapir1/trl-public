@@ -764,23 +764,21 @@ class GRPOTrainer(Trainer):
         for node_idx, node in enumerate(tree):
             # Suppose 'split' indicates how many children this node has
             # 'dont_calc_loss' is a boolean
-            if node.get("split", 0) > 1 and not node.get("dont_calc_loss"):
-                # Gather child nodes from the tree
-                child_indices = [i for i, n in enumerate(tree) if n["parent_idx"] == node_idx and len(n['completion_ids']) < MAX_COMPLEATION_TOKENS]
-                if not child_indices:
-                    continue
-                # Check std dev of those children’s rewards
-                child_rewards = [tree[ch_idx].get("reward", 0) for ch_idx in child_indices]
-                std_reward = torch.tensor(child_rewards, device=device).float().std()
-                if std_reward > 1e-9:  # Some small threshold
-                    valid_nodes.append((node_idx, child_indices))
+            child_indices = [i for i, n in enumerate(tree) if n["parent_idx"] == node_idx and len(n['completion_ids']) < MAX_COMPLEATION_TOKENS]
+            if len(child_indices)<2:
+                continue
+            # Check std dev of those children’s rewards
+            child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
+            std_reward = torch.tensor(child_rewards, device=device).float().std()
+            if std_reward > 1e-9:  # Some small threshold
+                valid_nodes.append((node_idx, child_indices))
 
         # -----------------------------------------------------
         # 4) Build a dictionary for each valid group
         # -----------------------------------------------------
         for node_idx, child_indices in valid_nodes:
             # Collect child completions
-            child_rewards = [tree[ch_idx].get("reward", 0) for ch_idx in child_indices]
+            child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
             std_r = float(torch.tensor(child_rewards).float().std())

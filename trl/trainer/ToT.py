@@ -164,7 +164,7 @@ class TreeOfThoughts:
                     'next_split':LAST_SPLIT,
                     }
 
-            if first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
+            if any(t in full_ans for t in [THINK_END_TOKEN, THINK_START_TOKEN, ANSWER_END_TOKEN]) or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
                 node['reward'] = 0
                 node['to_stop'] = True
                 final_nodes.append((0, node['reward']))
@@ -343,12 +343,12 @@ class TreeOfThoughts:
             self.propogate_reward(node[0], node[1], tree)
 
         for n in tree:
-            rewards = n.get('rewards',[1])
-            std = np.std(rewards)
-            if std:
-                n['reward'] = np.mean(rewards)
+            reward = n.get('reward')
+            if reward is not None:
+                n['reward'] = reward
             else:
-                n['dont_calc_loss'] = True
+                n['reward'] = np.mean(n['rewards'])
+
 
         if random.random() < 1:
             json.dump(tree,open(f'/workspace/Data_in_training/{time.time()}','w'))
