@@ -174,7 +174,7 @@ class TreeOfThoughts:
                 node['to_stop'] = True
                 final_nodes.append((0, node['reward']))
                 print('1 Down')
-                node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason)==str else ''
+                node['text'] = (first_full_completion.stop_reason if type(first_full_completion.stop_reason)==str else '')
                 node['completion_ids'] = first_full_completion.token_ids
 
 
@@ -192,7 +192,7 @@ class TreeOfThoughts:
                     node['completion_ids'] = self.tokenizer.encode(text)
 
                 else:
-                    node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason) == str else ''
+                    node['text'] = (first_full_completion.stop_reason if type(first_full_completion.stop_reason)==str else '')
                     node['completion_ids'] = first_full_completion.token_ids
                     node['predict_answer'] = True
 
