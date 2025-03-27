@@ -45,7 +45,7 @@ from transformers import (
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
 
-from trl.trainer.ToT_orig import TreeOfThoughts
+from trl.trainer.ToT import TreeOfThoughts
 from ..extras.profiling import profiling_decorator
 from ..import_utils import is_vllm_available
 from ..models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
