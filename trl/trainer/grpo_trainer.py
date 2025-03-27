@@ -45,7 +45,7 @@ from transformers import (
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
 
-from trl.trainer.ToT_orig import TreeOfThoughts
+from trl.trainer.ToT import TreeOfThoughts
 from ..extras.profiling import profiling_decorator
 from ..import_utils import is_vllm_available
 from ..models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
@@ -577,6 +577,7 @@ class GRPOTrainer(Trainer):
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
+        # self.model.to
         # self.ref_model = self.ref_model.to('cuda:1')
 
 
@@ -743,6 +744,18 @@ class GRPOTrainer(Trainer):
         if self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
+
+        import torch
+
+        def is_model_bfloat16(model):
+            for param in model.parameters():
+                if param.dtype != torch.bfloat16:
+                    return False
+            return True
+
+        # Usage
+        # model = torch.load("your_model.pth") or model = YourModel(); model.load_state_dict(...)
+        print(is_model_bfloat16(self.model_wrapped))
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
