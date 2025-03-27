@@ -346,7 +346,8 @@ class TreeOfThoughts:
             depth_1_rewards = []
             for n in tree:
                 if n['depth'] == 1:
-                    depth_1_rewards.extend(n['rewards'])
+                    rewards = n.get('rewards') or [n['reward']]
+                    depth_1_rewards.extend(rewards)
             assert sorted(depth_1_rewards) == sorted(final_nodes_rewards)
         except:
             print(logs)
