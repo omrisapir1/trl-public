@@ -196,8 +196,8 @@ class TreeOfThoughts:
 
 
             tree.append(node)
-            print(tree)
-            raise
+        print(tree)
+        raise
             #
             #
             # thoughts_count = full_ans.count(THINK_END_TOKEN) + 1
