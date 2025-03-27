@@ -183,7 +183,7 @@ class TreeOfThoughts:
 
                 if thoughts_count > 1:
 
-                    thought_index = max(int(thoughts_count/2), MIN_THINK_TAG_SPLIT)
+                    thought_index = min(int(thoughts_count/2), MIN_THINK_TAG_SPLIT)
                     start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, thought_index) + len(THINK_BOTH_TOKEN)
                     text = full_ans[:start_index]
                     node['text'] = text
