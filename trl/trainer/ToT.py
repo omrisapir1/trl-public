@@ -187,7 +187,7 @@ class TreeOfThoughts:
                     start_index = kth_occurrence_from_end(full_ans, THINK_BOTH_TOKEN, thought_index) + len(THINK_BOTH_TOKEN)
                     text = full_ans[:start_index]
                     node['text'] = text
-                    node['completion_ids'] = self.llm.tokenizer.encode(text)
+                    node['completion_ids'] = self.tokenizer.encode(text)
 
                 else:
                     node['text'] = (full_ans + first_full_completion.stop_reason) if type(first_full_completion.stop_reason) == str else ''
