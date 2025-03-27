@@ -749,6 +749,7 @@ class GRPOTrainer(Trainer):
 
         def is_model_bfloat16(model):
             for param in model.parameters():
+                print(param.dtype)
                 if param.dtype != torch.bfloat16:
                     return False
             return True
