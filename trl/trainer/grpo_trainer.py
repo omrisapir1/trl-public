@@ -291,7 +291,7 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)#.to('cuda:0')
+            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs).to(dtype=torch.bfloat16)#.to('cuda:0')
         else:
             model_id = model.config._name_or_path
             if args.model_init_kwargs is not None:
@@ -757,6 +757,7 @@ class GRPOTrainer(Trainer):
         # Usage
         # model = torch.load("your_model.pth") or model = YourModel(); model.load_state_dict(...)
         print(is_model_bfloat16(self.model_wrapped))
+        print(is_model_bfloat16(self.ref_model))
         device = self.accelerator.device
         group_dicts = []  # We'll accumulate the final group dicts here
 
