@@ -672,9 +672,9 @@ class GRPOTrainer(Trainer):
         try:
             logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
         except:
-            print(input_ids.shape)
-            print(input_ids)
+            print('Memory error for ''per_token_logps')
             torch.cuda.empty_cache()
+            return None
         logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
 
         input_ids = input_ids[:, -logits_to_keep:]
@@ -787,7 +787,7 @@ class GRPOTrainer(Trainer):
             child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
-            std_r = float(torch.tensor(child_rewards).float().std())
+            # std_r = float(torch.tensor(child_rewards).float().std())
 
             advantages = []
             for r in child_rewards:
@@ -813,6 +813,7 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
             batch_size = prompt_completion_ids.size(0)
             max_chunk_size = 2
+            break_it = False
             with torch.no_grad():
                 if batch_size >= max_chunk_size:
                     outputs = []
@@ -827,6 +828,9 @@ class GRPOTrainer(Trainer):
                             m_chunk,
                             logits_to_keep
                         )
+                        if sub_output is None:
+                            break_it = True
+                        break
                         outputs.append(sub_output)
                     # Concatenate the outputs along the batch dimension
                     ref_per_token_logps = torch.cat(outputs, dim=0)
@@ -837,6 +841,11 @@ class GRPOTrainer(Trainer):
                         attention_mask.to(self.ref_model.device),
                         logits_to_keep
                     )
+                    if ref_per_token_logps is None:
+                        break_it = True
+                    break
+            if break_it:
+                continue
 
             group_dict = {
                 "prompt_ids": prompt_ids,
