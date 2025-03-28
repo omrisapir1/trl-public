@@ -791,7 +791,7 @@ class GRPOTrainer(Trainer):
 
             advantages = []
             for r in child_rewards:
-                advantages.append((r - mean_r) / (std_r + 1e-9))
+                advantages.append((r - mean_r)) #/ (std_r + 1e-9))
             advantages = torch.tensor(advantages)
 
 
