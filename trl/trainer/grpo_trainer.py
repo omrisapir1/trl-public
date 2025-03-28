@@ -913,6 +913,8 @@ class GRPOTrainer(Trainer):
             per_token_kl = (
                 torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
+            print('THIIS IS num per_token_kl', per_token_kl)
+            print('------')
 
         # Compute the loss
         advantages = inputs["advantages"]
