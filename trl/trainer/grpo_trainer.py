@@ -913,20 +913,13 @@ class GRPOTrainer(Trainer):
             per_token_kl = (
                 torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
-            print('THIIS IS num per_token_kl', per_token_kl)
-            print('------')
 
         # Compute the loss
         advantages = inputs["advantages"]
         advantages = advantages.to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
-        print('THIIS IS num iteration', self.num_iterations)
-        print('------')
         old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
-        print('THIIS IS old_per_token_logps', old_per_token_logps)
-        print('------')
-        print('THIIS IS per_token_logps', per_token_logps)
         coef_1 = torch.exp(per_token_logps - old_per_token_logps)
         coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
         per_token_loss1 = coef_1 * advantages.unsqueeze(1)
@@ -934,16 +927,9 @@ class GRPOTrainer(Trainer):
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         completion_mask = completion_mask.to(self.model.device)
         if self.beta != 0.0:
-            print('THIIS IS per_token_loss before', per_token_loss)
             per_token_loss = per_token_loss + self.beta * per_token_kl
-            print('-------')
-        print('-------------')
-        print('THIIS IS per_token_loss', per_token_loss)
+        print(per_token_loss.to(self.model.device) * completion_mask)
         loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
-        print('-------------')
-        print('this is loss', loss)
-        print('-------------')
-
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
