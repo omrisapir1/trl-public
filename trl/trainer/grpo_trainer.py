@@ -830,8 +830,10 @@ class GRPOTrainer(Trainer):
                         )
                         if sub_output is None:
                             break_it = True
-                        break
+                            break
                         outputs.append(sub_output)
+                    if break_it:
+                        continue
                     # Concatenate the outputs along the batch dimension
                     ref_per_token_logps = torch.cat(outputs, dim=0)
                 else:
@@ -843,7 +845,7 @@ class GRPOTrainer(Trainer):
                     )
                     if ref_per_token_logps is None:
                         break_it = True
-                    break
+                        break
             if break_it:
                 continue
 
