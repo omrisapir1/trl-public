@@ -919,6 +919,8 @@ class GRPOTrainer(Trainer):
         advantages = advantages.to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
+        print('THIIS IS num iteration', self.num_iterations)
+        print('------')
         old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
         print('THIIS IS old_per_token_logps', old_per_token_logps)
         print('------')
