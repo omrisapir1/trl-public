@@ -75,7 +75,7 @@ class TreeOfThoughts:
             top_k=TOP_K,
             repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
-            stop=['<answer>'],
+            stop=['<answer>','</answer>'],
             n=1  # Generate one continuation per prompt
         )
 
@@ -165,7 +165,7 @@ class TreeOfThoughts:
                     'next_split':LAST_SPLIT,
                     }
 
-            if ANSWER_END_TOKEN in full_ans or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
+            if ANSWER_START_TOKEN in full_ans or first_full_completion.finish_reason == 'length' or first_full_completion.stop_reason == END_OF_TEXT_ID_TOKEN or first_full_completion.stop_reason is None or first_full_completion.stop_reason != ANSWER_START_TOKEN:
                 node['reward'] = 0
                 node['to_stop'] = True
                 final_nodes.append((0, node['reward']))
@@ -356,7 +356,7 @@ class TreeOfThoughts:
             raise
 
         for n in tree[1:]:
-            calc_child = n['parent_idx'] <11
+            calc_child = n['parent_idx'] <3
             reward = n.get('reward')
             if reward is not None:
                 n['reward'] = (reward*calc_child)
