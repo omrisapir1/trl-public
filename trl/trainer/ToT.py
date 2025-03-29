@@ -356,7 +356,7 @@ class TreeOfThoughts:
             raise
 
         for n in tree[1:]:
-            calc_child = n['parent_idx'] >7
+            calc_child = n['parent_idx'] <11
             reward = n.get('reward')
             if reward is not None:
                 n['reward'] = (reward*calc_child)
