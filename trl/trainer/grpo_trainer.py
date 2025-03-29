@@ -787,11 +787,11 @@ class GRPOTrainer(Trainer):
             child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
-            # std_r = float(torch.tensor(child_rewards).float().std())
+            std_r = float(torch.tensor(child_rewards).float().std())
 
             advantages = []
             for r in child_rewards:
-                advantages.append((r - mean_r)) #/ (std_r + 1e-9))
+                advantages.append((r - mean_r) / (std_r + 1e-9))
             advantages = torch.tensor(advantages)
 
 
