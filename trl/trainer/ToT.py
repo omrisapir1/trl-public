@@ -28,7 +28,7 @@ N_TOTAL_SPLITS = 2
 LAST_SPLIT = 4
 CORRECT_STRUCTURE_REWARD = 0.1
 CORRECT_FLOAT_REWARD = 0.1
-FIRST_SPLIT_COUNT = 4
+FIRST_SPLIT_COUNT = 9
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=34, max_depth=9):
@@ -356,11 +356,14 @@ class TreeOfThoughts:
             raise
 
         for n in tree:
+            calc_child = n['parent_idx'] >7
             reward = n.get('reward')
             if reward is not None:
-                n['reward'] = reward
+                n['reward'] = (reward*calc_child)
             else:
-                n['reward'] = np.mean(n['rewards'])
+                n['reward'] = (np.mean(n['rewards'])*calc_child)
+
+
 
 
         if random.random() < 1:
