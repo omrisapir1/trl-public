@@ -28,7 +28,7 @@ N_TOTAL_SPLITS = 2
 LAST_SPLIT = 4
 CORRECT_STRUCTURE_REWARD = 0.1
 CORRECT_FLOAT_REWARD = 0.1
-FIRST_SPLIT_COUNT = 9
+FIRST_SPLIT_COUNT = 4
 
 class TreeOfThoughts:
     def __init__(self, llm, max_split_depth=34, max_depth=9):
