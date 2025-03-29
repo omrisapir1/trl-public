@@ -775,7 +775,7 @@ class GRPOTrainer(Trainer):
                 continue
             # Check std dev of those children’s rewards
             child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
-            # std_reward = torch.tensor(child_rewards, device=device).float().std()
+            std_reward = torch.tensor(child_rewards, device=device).float().std()
             if std_reward > 1e-9:  # Some small threshold
                 valid_nodes.append((node_idx, child_indices))
 
@@ -787,7 +787,7 @@ class GRPOTrainer(Trainer):
             child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
-            std_r = float(torch.tensor(child_rewards).float().std())
+            # std_r = float(torch.tensor(child_rewards).float().std())
 
             advantages = []
             for r in child_rewards:
