@@ -355,7 +355,7 @@ class TreeOfThoughts:
             print(tree)
             raise
 
-        for n in tree:
+        for n in tree[1:]:
             calc_child = n['parent_idx'] >7
             reward = n.get('reward')
             if reward is not None:
