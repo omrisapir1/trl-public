@@ -909,8 +909,9 @@ class GRPOTrainer(Trainer):
                 )
 
         except:
-            print(input_ids)
-            raise
+            torch.cuda.empty_cache()
+            per_token_logps = None
+            
 
         if per_token_logps is None:
             return
