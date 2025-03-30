@@ -74,7 +74,7 @@ if is_wandb_available():
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 MAX_COMPLEATION_TOKENS = 1200
 
-MAX_TOKENS = 256
+MAX_TOKENS = 512
 
 class RepeatRandomSampler(Sampler):
     """
@@ -747,7 +747,7 @@ class GRPOTrainer(Trainer):
         """
         print('num iterations ', self.num_iterations)
         print('_last_loaded_step ', self._last_loaded_step)
-        print('global_step ', self._last_loaded_step)
+        print('global_step ', self.state.global_step)
         if self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
