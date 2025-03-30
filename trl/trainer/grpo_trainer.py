@@ -74,6 +74,8 @@ if is_wandb_available():
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 MAX_COMPLEATION_TOKENS = 1200
 
+MAX_TOKENS = 256
+
 class RepeatRandomSampler(Sampler):
     """
     Sampler that repeats the indices of a dataset in a structured manner.
@@ -309,6 +311,8 @@ class GRPOTrainer(Trainer):
         if args.gradient_checkpointing:
             model = self._enable_gradient_checkpointing(model, args)
 
+        self.ref_model = None
+
         # Reference model
         self.beta = args.beta
         if self.beta == 0.0:
@@ -321,8 +325,9 @@ class GRPOTrainer(Trainer):
             # to revert to the initial model.
             self.ref_model = None
         else:
+            pass
             # If PEFT configuration is not provided, create a reference model based on the initial model.
-            self.ref_model = create_reference_model(model)
+            # self.ref_model = create_reference_model(model)
 
         # Processing class
         if processing_class is None:
@@ -740,7 +745,9 @@ class GRPOTrainer(Trainer):
         4) For each valid group with non-zero std dev in rewards, compute advantages and collect token/attention/logits info.
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
-
+        print('num iterations ', self.num_iterations)
+        print('_last_loaded_step ', self._last_loaded_step)
+        print('global_step ', self._last_loaded_step)
         if self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
@@ -787,11 +794,11 @@ class GRPOTrainer(Trainer):
             child_rewards = [tree[ch_idx]["reward"] for ch_idx in child_indices]
             # mean, std for advantage
             mean_r = float(sum(child_rewards)) / len(child_rewards)
-            std_r = float(torch.tensor(child_rewards).float().std())
+            # std_r = float(torch.tensor(child_rewards).float().std())
 
             advantages = []
             for r in child_rewards:
-                advantages.append((r - mean_r) / (std_r + 1e-9))
+                advantages.append((r - mean_r))# / (std_r + 1e-9))
             advantages = torch.tensor(advantages)
 
 
@@ -808,46 +815,46 @@ class GRPOTrainer(Trainer):
             prompt_mask = torch.ones_like(prompt_ids)
             completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
 
-            prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
-            logits_to_keep = completion_ids.size(1)
-            batch_size = prompt_completion_ids.size(0)
-            max_chunk_size = 2
-            break_it = False
-            with torch.no_grad():
-                if batch_size >= max_chunk_size:
-                    outputs = []
-                    # Process the batch in chunks along the first dimension
-                    for i in range(0, batch_size, max_chunk_size):
-                        p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                        m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-
-                        sub_output = self._get_per_token_logps(
-                            self.ref_model,
-                            p_chunk,
-                            m_chunk,
-                            logits_to_keep
-                        )
-                        if sub_output is None:
-                            break_it = True
-                            break
-                        outputs.append(sub_output)
-                    if break_it:
-                        continue
-                    # Concatenate the outputs along the batch dimension
-                    ref_per_token_logps = torch.cat(outputs, dim=0)
-                else:
-                    ref_per_token_logps = self._get_per_token_logps(
-                        self.ref_model,
-                        prompt_completion_ids.to(self.ref_model.device),
-                        attention_mask.to(self.ref_model.device),
-                        logits_to_keep
-                    )
-                    if ref_per_token_logps is None:
-                        break_it = True
-                        break
-            if break_it:
-                continue
+            # prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+            # attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+            # logits_to_keep = completion_ids.size(1)
+            # batch_size = prompt_completion_ids.size(0)
+            # max_chunk_size = 2
+            # break_it = False
+            # with torch.no_grad():
+            #     if batch_size >= max_chunk_size:
+            #         outputs = []
+            #         # Process the batch in chunks along the first dimension
+            #         for i in range(0, batch_size, max_chunk_size):
+            #             p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+            #             m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+            #
+            #             sub_output = self._get_per_token_logps(
+            #                 self.ref_model,
+            #                 p_chunk,
+            #                 m_chunk,
+            #                 logits_to_keep
+            #             )
+            #             if sub_output is None:
+            #                 break_it = True
+            #                 break
+            #             outputs.append(sub_output)
+            #         if break_it:
+            #             continue
+            #         # Concatenate the outputs along the batch dimension
+            #         ref_per_token_logps = torch.cat(outputs, dim=0)
+            #     else:
+            #         ref_per_token_logps = self._get_per_token_logps(
+            #             self.ref_model,
+            #             prompt_completion_ids.to(self.ref_model.device),
+            #             attention_mask.to(self.ref_model.device),
+            #             logits_to_keep
+            #         )
+            #         if ref_per_token_logps is None:
+            #             break_it = True
+            #             break
+            # if break_it:
+            #     continue
 
             group_dict = {
                 "prompt_ids": prompt_ids,
@@ -856,7 +863,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,
-                "ref_per_token_logps": ref_per_token_logps.detach().cpu() if ref_per_token_logps is not None else None,
+                "ref_per_token_logps": None,
             }
             group_dicts.append(group_dict)
 
@@ -907,12 +914,12 @@ class GRPOTrainer(Trainer):
 
 
         # Compute the KL divergence between the model and the reference model
-        if self.beta != 0.0:
-            ref_per_token_logps = inputs["ref_per_token_logps"]
-            ref_per_token_logps = ref_per_token_logps.to(model.device)
-            per_token_kl = (
-                torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
-            )
+        # if self.beta != 0.0:
+        #     ref_per_token_logps = inputs["ref_per_token_logps"]
+        #     ref_per_token_logps = ref_per_token_logps.to(model.device)
+        #     per_token_kl = (
+        #         torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
+        #     )
 
         # Compute the loss
         advantages = inputs["advantages"]
@@ -926,19 +933,19 @@ class GRPOTrainer(Trainer):
         per_token_loss2 = coef_2 * advantages.unsqueeze(1)
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         completion_mask = completion_mask.to(self.model.device)
-        if self.beta != 0.0:
-            print('----before-----', per_token_loss.mean())
-            per_token_loss = per_token_loss + self.beta * per_token_kl
+        # if self.beta != 0.0:
+        #     print('----before-----', per_token_loss.mean())
+        #     per_token_loss = per_token_loss + self.beta * per_token_kl
 
-        print('----after-----', per_token_loss.mean())
-        loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / completion_mask.sum()
+
+        loss = (per_token_loss.to(self.model.device) * completion_mask).sum() / MAX_TOKENS#completion_mask.sum()
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
 
-        if self.beta != 0.0:
-            mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
-            self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
+        # if self.beta != 0.0:
+        #     mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
+        #     self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
 
         is_clipped = (per_token_loss1 < per_token_loss2).float()
         clip_ratio = (is_clipped * completion_mask).sum() / completion_mask.sum()
