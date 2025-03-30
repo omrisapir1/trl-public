@@ -745,10 +745,8 @@ class GRPOTrainer(Trainer):
         4) For each valid group with non-zero std dev in rewards, compute advantages and collect token/attention/logits info.
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
-        print('num iterations ', self.num_iterations)
-        print('_last_loaded_step ', self._last_loaded_step)
-        print('global_step ', self.state.global_step)
-        if self.state.global_step != self._last_loaded_step:
+
+        if  self._last_loaded_step % 2 == 0:#self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
 
@@ -815,46 +813,48 @@ class GRPOTrainer(Trainer):
             prompt_mask = torch.ones_like(prompt_ids)
             completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
 
-            # prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-            # attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
-            # logits_to_keep = completion_ids.size(1)
-            # batch_size = prompt_completion_ids.size(0)
-            # max_chunk_size = 2
-            # break_it = False
-            # with torch.no_grad():
-            #     if batch_size >= max_chunk_size:
-            #         outputs = []
-            #         # Process the batch in chunks along the first dimension
-            #         for i in range(0, batch_size, max_chunk_size):
-            #             p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-            #             m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-            #
-            #             sub_output = self._get_per_token_logps(
-            #                 self.ref_model,
-            #                 p_chunk,
-            #                 m_chunk,
-            #                 logits_to_keep
-            #             )
-            #             if sub_output is None:
-            #                 break_it = True
-            #                 break
-            #             outputs.append(sub_output)
-            #         if break_it:
-            #             continue
-            #         # Concatenate the outputs along the batch dimension
-            #         ref_per_token_logps = torch.cat(outputs, dim=0)
-            #     else:
-            #         ref_per_token_logps = self._get_per_token_logps(
-            #             self.ref_model,
-            #             prompt_completion_ids.to(self.ref_model.device),
-            #             attention_mask.to(self.ref_model.device),
-            #             logits_to_keep
-            #         )
-            #         if ref_per_token_logps is None:
-            #             break_it = True
-            #             break
-            # if break_it:
-            #     continue
+            if self._last_loaded_step % 2 == 1:
+
+                prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+                attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+                logits_to_keep = completion_ids.size(1)
+                batch_size = prompt_completion_ids.size(0)
+                max_chunk_size = 2
+                break_it = False
+                with torch.no_grad():
+                    if batch_size >= max_chunk_size:
+                        outputs = []
+                        # Process the batch in chunks along the first dimension
+                        for i in range(0, batch_size, max_chunk_size):
+                            p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+                            m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+
+                            sub_output = self._get_per_token_logps(
+                                self.model,
+                                p_chunk,
+                                m_chunk,
+                                logits_to_keep
+                            )
+                            if sub_output is None:
+                                break_it = True
+                                break
+                            outputs.append(sub_output)
+                        if break_it:
+                            continue
+                        # Concatenate the outputs along the batch dimension
+                        old_per_token_logps = torch.cat(outputs, dim=0)
+                    else:
+                        old_per_token_logps = self._get_per_token_logps(
+                            self.model,
+                            prompt_completion_ids.to(self.model.device),
+                            attention_mask.to(self.model.device),
+                            logits_to_keep
+                        )
+                        if old_per_token_logps is None:
+                            break_it = True
+                            break
+                if break_it:
+                    continue
 
             group_dict = {
                 "prompt_ids": prompt_ids,
@@ -862,7 +862,7 @@ class GRPOTrainer(Trainer):
                 "completion_ids": completion_ids,
                 "completion_mask": completion_mask,
                 "advantages": advantages,
-                "old_per_token_logps": None,
+                "old_per_token_logps": old_per_token_logps,
                 "ref_per_token_logps": None,
             }
             group_dicts.append(group_dict)
@@ -928,7 +928,8 @@ class GRPOTrainer(Trainer):
         advantages = advantages.to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
-        old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
+        print(self._last_loaded_step % 2)
+        old_per_token_logps = inputs["old_per_token_logps"] if self._last_loaded_step % 2 else per_token_logps.detach()
         coef_1 = torch.exp(per_token_logps - old_per_token_logps)
         coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
         per_token_loss1 = coef_1 * advantages.unsqueeze(1)
