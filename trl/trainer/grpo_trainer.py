@@ -812,7 +812,7 @@ class GRPOTrainer(Trainer):
 
             prompt_mask = torch.ones_like(prompt_ids)
             completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
-
+            old_per_token_logps = None
             if self._last_loaded_step % 2 == 1:
 
                 prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
