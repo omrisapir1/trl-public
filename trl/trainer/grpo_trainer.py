@@ -826,8 +826,8 @@ class GRPOTrainer(Trainer):
                         outputs = []
                         # Process the batch in chunks along the first dimension
                         for i in range(0, batch_size, max_chunk_size):
-                            p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                            m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+                            p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.model.device)
+                            m_chunk = attention_mask[i:i + max_chunk_size].to(self.model.device)
 
                             sub_output = self._get_per_token_logps(
                                 self.model,
