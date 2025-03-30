@@ -515,7 +515,7 @@ class GRPOTrainer(Trainer):
                         model=model.name_or_path,
                         # tensor_parallel_size=2,
                         device=vllm_device,
-                        gpu_memory_utilization=0.3,
+                        gpu_memory_utilization=0.8,
                         # dtype=torch.bfloat16,
                         max_num_seqs=64,
 
@@ -912,7 +912,8 @@ class GRPOTrainer(Trainer):
             print(input_ids)
             raise
 
-
+        if per_token_logps is None:
+            return
         # Compute the KL divergence between the model and the reference model
         # if self.beta != 0.0:
         #     ref_per_token_logps = inputs["ref_per_token_logps"]
@@ -960,6 +961,8 @@ class GRPOTrainer(Trainer):
         with torch.no_grad():
             with self.compute_loss_context_manager():
                 loss = self.compute_loss(model, inputs)
+                if loss is None:
+                    return None, None, None
             loss = loss.mean().detach()
         return loss, None, None
 
