@@ -318,8 +318,8 @@ class GRPOTrainer(Trainer):
         if self.beta == 0.0:
             # If beta is 0.0, the reference model is not needed
             self.ref_model = None
-        elif is_deepspeed_zero3_enabled():
-            self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
+        # elif is_deepspeed_zero3_enabled():
+        #     self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
         elif is_peft_model(model):
             # If PEFT is used, the reference model is not needed since the adapter can be disabled
             # to revert to the initial model.
@@ -504,11 +504,11 @@ class GRPOTrainer(Trainer):
 
                 new_group_patch = new_group_context() if device_type == "npu" else contextlib.nullcontext()
 
-                if self.ref_model is not None:
-                    if self.is_deepspeed_enabled:
-                        self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
-                    else:
-                        self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
+                # if self.ref_model is not None:
+                #     if self.is_deepspeed_enabled:
+                #         self.ref_model = prepare_deepspeed(self.ref_model, self.accelerator)
+                #     else:
+                #         self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
 
                 with world_size_patch, profiling_patch, new_group_patch:
                     self.llm = LLM(
@@ -576,8 +576,8 @@ class GRPOTrainer(Trainer):
 
 
         # self.model.to('cuda:0')
-        if args.sync_ref_model:
-            self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
+        # if args.sync_ref_model:
+        #     self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
 
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, PreTrainedModel):
