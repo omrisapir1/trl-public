@@ -746,7 +746,7 @@ class GRPOTrainer(Trainer):
         5) Return a list of dicts—one per group—each to be used by compute_loss.
         """
 
-        if  self._last_loaded_step % 2 == 0:#self.state.global_step != self._last_loaded_step:
+        if  self.state.global_step % 2 == 0:#self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
 
@@ -813,7 +813,7 @@ class GRPOTrainer(Trainer):
             prompt_mask = torch.ones_like(prompt_ids)
             completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
             old_per_token_logps = None
-            if self._last_loaded_step % 2 == 1:
+            if self.state.global_step % 2 == 1:
 
                 prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
                 attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
@@ -928,7 +928,7 @@ class GRPOTrainer(Trainer):
         advantages = advantages.to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
-        print(self._last_loaded_step % 2)
+        print(self.state.global_step % 2)
         old_per_token_logps = inputs["old_per_token_logps"] if self._last_loaded_step % 2 else per_token_logps.detach()
         coef_1 = torch.exp(per_token_logps - old_per_token_logps)
         coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
