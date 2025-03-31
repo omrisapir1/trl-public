@@ -108,11 +108,13 @@ class SyncRefModelCallback(TrainerCallback):
 
     @staticmethod
     def _sync_target_model(model, target_model, alpha):
+        print('Im syncing_')
         for target_param, copy_param in zip(target_model.parameters(), model.parameters()):
             target_param.data.mul_(1.0 - alpha).add_(copy_param.data, alpha=alpha)
 
     @staticmethod
     def sync_target_model(model, target_model, alpha):
+        print('Im syncing')
         deepspeed_plugin = AcceleratorState().deepspeed_plugin
         if deepspeed_plugin is not None and deepspeed_plugin.zero_stage == 3:
             with deepspeed.zero.GatheredParameters(
