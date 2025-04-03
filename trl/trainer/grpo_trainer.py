@@ -1082,7 +1082,7 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
 
-        per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device), attention_mask.to(model.device), logits_to_keep.to(model.device))
+        per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device), attention_mask.to(model.device), logits_to_keep)
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
