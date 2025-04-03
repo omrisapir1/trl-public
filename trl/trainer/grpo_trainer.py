@@ -73,7 +73,7 @@ if is_wandb_available():
 # rewards. When it's a string, it's a model ID, so it's loaded as a pretrained model.
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 
-
+MAX_TOKENS_TO_CALC_LOSS = 512
 class RepeatRandomSampler(Sampler):
     """
     Sampler that repeats the indices of a dataset in a structured manner.
@@ -1105,7 +1105,8 @@ class GRPOTrainer(Trainer):
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
-        loss = (per_token_loss * completion_mask).sum() / completion_mask.sum()
+
+        loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
 
         # Log the metrics
         mode = "eval" if self.control.should_evaluate else "train"
