@@ -17,7 +17,7 @@ import textwrap
 import warnings
 from collections import defaultdict
 from contextlib import nullcontext
-from typing import Any, Callable, Optional, Sized, Union
+from typing import Any, Callable, Optional, Sized, Union, List
 
 import torch
 import torch.utils.data
@@ -39,7 +39,7 @@ from transformers import (
     is_wandb_available,
 )
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
-from transformers.utils import is_liger_kernel_available, is_peft_available
+from transformers.utils import is_peft_available
 
 from ..data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
 from ..extras.profiling import profiling_context, profiling_decorator
@@ -48,6 +48,7 @@ from ..import_utils import is_deepspeed_available, is_rich_available, is_vllm_av
 from ..models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
 from .callbacks import SyncRefModelCallback
 from .grpo_config import GRPOConfig
+from .ToT import TreeOfThoughts
 from .utils import (
     generate_model_card,
     get_comet_experiment_url,
@@ -63,8 +64,6 @@ if is_deepspeed_available():
 if is_peft_available():
     from peft import PeftConfig, get_peft_model
 
-if is_liger_kernel_available():
-    from liger_kernel.chunked_loss import LigerFusedLinearGRPOLoss
 
 if is_wandb_available():
     import wandb
@@ -179,6 +178,7 @@ def nanstd(tensor: torch.Tensor) -> torch.Tensor:
     count = torch.sum(~torch.isnan(tensor))  # Count of non-NaN values
     variance *= count / (count - 1)  # Bessel's correction
     return torch.sqrt(variance)
+
 
 
 class GRPOTrainer(Trainer):
@@ -407,7 +407,6 @@ class GRPOTrainer(Trainer):
         self.min_p = args.min_p
         self.repetition_penalty = args.repetition_penalty
         self.use_vllm = args.use_vllm
-        self.use_liger_loss = args.use_liger_loss
 
         # Multi-step
         self.num_iterations = args.num_iterations  # = 𝜇 in the GRPO paper
@@ -426,22 +425,6 @@ class GRPOTrainer(Trainer):
         # suppress this warning, we set the "estimate_tokens" key in the model's "warnings_issued" dictionary to True.
         # This acts as a flag to indicate that the warning has already been issued.
         model.warnings_issued["estimate_tokens"] = True
-
-        if self.use_liger_loss:
-            if not is_liger_kernel_available():
-                raise ImportError(
-                    "Liger is required to use `liger_loss` as the GRPO loss. Run `pip install liger-kernel`."
-                )
-            if is_peft_model(model):
-                raise ValueError("Liger loss is not supported with a PEFT model.")
-
-            self.liger_grpo_loss = LigerFusedLinearGRPOLoss(
-                beta=self.beta,
-                epsilon_low=self.epsilon_low,
-                epsilon_high=self.epsilon_high,
-                temperature=self.temperature,
-                use_ref_model=self.ref_model is not None,
-            )
 
         # Initialize the metrics
         self._metrics = {"train": defaultdict(list), "eval": defaultdict(list)}
@@ -506,6 +489,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
+            self.tree_of_thought = TreeOfThoughts(self.vllm_client)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
@@ -621,22 +605,13 @@ class GRPOTrainer(Trainer):
 
         return model
 
-    @profiling_decorator
-    def _get_last_hidden_state(self, model, input_ids, attention_mask, logits_to_keep=None):
-        # unwrap the model to access the model.model
-        unwrapped_model = self.accelerator.unwrap_model(model)
-        last_hidden_state = unwrapped_model.model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-        last_hidden_state = last_hidden_state[:, :-1, :]  # (B, L-1, H)
-        if logits_to_keep is not None:
-            last_hidden_state = last_hidden_state[:, -logits_to_keep:, :]  # (B, logits_to_keep, H)
-        return last_hidden_state
-
     # Get the per-token log probabilities for the completions for the model and the reference model
     @profiling_decorator
     def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
         # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
         logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
         logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+
         input_ids = input_ids[:, -logits_to_keep:]
         # For transformers<=4.48, logits_to_keep argument isn't supported, so here we drop logits ourselves.
         # See https://github.com/huggingface/trl/issues/2770
@@ -694,16 +669,94 @@ class GRPOTrainer(Trainer):
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
-                # buffered_inputs=None can occur when resuming from a checkpoint
-                inputs = self._generate_and_score_completions(inputs)
+                tree_root = self.tree_generator.generate_tree(inputs)
+                inputs = self._convert_tree_to_training_inputs(tree_root)
                 self._buffered_inputs[buffer_index] = inputs
             else:
                 inputs = buffered_inputs
             self._step += 1
         else:
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
-            inputs = self._generate_and_score_completions(inputs)
+            tree_root = self.tree_generator.generate_tree(inputs)
+            inputs = self._convert_tree_to_training_inputs(tree_root)
         return inputs
+
+    def _convert_tree_to_training_inputs(self, tree_root) -> List[dict]:
+        if self.state.global_step != self._last_loaded_step:
+            self._move_model_to_vllm()
+            self._last_loaded_step = self.state.global_step
+
+        device = self.accelerator.device
+        group_dicts = []  # We'll accumulate the final group dicts here
+
+        def process_node(node):
+            if len(node.children) < 2:
+                return  # Not a group (no or single child)
+
+            # Collect rewards and filter invalid completions
+            child_nodes = [c for c in node.children if c.reward is not None]
+
+            child_rewards = [c.reward for c in child_nodes]
+            std_r = torch.tensor(child_rewards).float().std()
+            if std_r <= 1e-9:
+                return  # Avoid dividing by near-zero std
+
+            mean_r = sum(child_rewards) / len(child_rewards)
+            advantages = torch.tensor([(r - mean_r) / (std_r + 1e-9) for r in child_rewards])
+
+            # Gather IDs
+            prompt_ids = torch.stack([torch.tensor(c.prompt_ids) for c in child_nodes], dim=0)
+            completion_ids = [torch.tensor(c.completion_ids) for c in child_nodes]
+            completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
+
+            prompt_mask = torch.ones_like(prompt_ids)
+            completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
+
+            # Prepare for ref logps
+            prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+            logits_to_keep = completion_ids.size(1)
+
+            # Chunked ref log prob computation (memory-safe)
+            max_chunk_size = 2
+            batch_size = prompt_completion_ids.size(0)
+            outputs = []
+            for i in range(0, batch_size, max_chunk_size):
+                p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(device)
+                m_chunk = attention_mask[i:i + max_chunk_size].to(device)
+                with torch.no_grad():
+                    sub_output = self._get_per_token_logps(
+                        self.ref_model,
+                        p_chunk,
+                        m_chunk,
+                        logits_to_keep
+                    )
+                if sub_output is None:
+                    return  # Skip this group
+                outputs.append(sub_output)
+
+            ref_per_token_logps = torch.cat(outputs, dim=0)
+
+            # Build group dict
+            group_dicts.append({
+                "prompt_ids": prompt_ids,
+                "prompt_mask": prompt_mask,
+                "completion_ids": completion_ids,
+                "completion_mask": completion_mask,
+                "advantages": advantages,
+                "old_per_token_logps": None,  # or fill in if needed
+                "ref_per_token_logps": ref_per_token_logps,
+            })
+
+            # Recurse down the tree
+            for child in child_nodes:
+                process_node(child)
+
+        # Start recursion
+        process_node(tree_root)
+
+        return group_dicts
+
 
     def _generate_and_score_completions(
         self, inputs: dict[str, Union[torch.Tensor, Any]]
@@ -995,56 +1048,17 @@ class GRPOTrainer(Trainer):
             "prompt_mask": prompt_mask,
             "completion_ids": completion_ids,
             "completion_mask": completion_mask,
-            "advantages": advantages,
             "old_per_token_logps": old_per_token_logps,
             "ref_per_token_logps": ref_per_token_logps,
+            "advantages": advantages,
         }
-
-    def compute_liger_loss(self, model, inputs):
-        # Compute the per-token log probabilities for the model
-        prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
-        completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
-        input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
-        logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
-
-        # get the last hidden state of the model
-        last_hidden_state = self._get_last_hidden_state(model, input_ids, attention_mask, logits_to_keep)
-        unwrapped_model = self.accelerator.unwrap_model(model)
-        # compute loss and metrics using liger grpo loss
-        loss, metrics = self.liger_grpo_loss(
-            _input=last_hidden_state,
-            lin_weight=unwrapped_model.lm_head.weight,
-            selected_token_ids=completion_ids,
-            attention_mask=completion_mask,
-            advantages=inputs["advantages"],
-            bias=unwrapped_model.lm_head.bias,
-            ref_per_token_logps=inputs["ref_per_token_logps"],
-            old_per_token_logps=inputs["old_per_token_logps"],
-        )
-        # Extract metrics from the liger_grpo_loss output
-        # KL divergence is the first metric when beta is non-zero
-        mean_kl = metrics[0] if self.beta != 0.0 else None
-        clip_ratio = metrics[-1]
-
-        mode = "eval" if self.control.should_evaluate else "train"
-        if self.beta != 0.0:
-            self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
-        self._metrics[mode]["clip_ratio"].append(self.accelerator.gather_for_metrics(clip_ratio).mean().item())
-        return loss
 
     @profiling_decorator
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
-        if self.use_liger_loss:
-            # Compute the loss using the liger grpo loss
-            return self.compute_liger_loss(model, inputs)
-        else:
-            return self._compute_loss(model, inputs)
-
-    def _compute_loss(self, model, inputs):
         # Compute the per-token log probabilities for the model
+
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
         completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
@@ -1093,7 +1107,8 @@ class GRPOTrainer(Trainer):
         inputs = self._prepare_inputs(inputs)
         with torch.no_grad():
             with self.compute_loss_context_manager():
-                loss = self.compute_loss(model, inputs)
+                losses = [self.compute_loss(model, g) for g in inputs]
+                loss = torch.stack(losses).mean()
             loss = loss.mean().detach()
         return loss, None, None
 
