@@ -1128,6 +1128,9 @@ class GRPOTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if isinstance(inputs, list):
             group_losses = [self._compute_loss_for_group(model, group) for group in inputs]
+            if not group_losses:
+                self.logger.warning("No valid groups for loss computation in this batch.")
+                return torch.tensor(0.0, device=self.accelerator.device)
             print(group_losses)
             loss = torch.stack(group_losses).mean()
             return loss
