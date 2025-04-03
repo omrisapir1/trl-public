@@ -386,7 +386,7 @@ class TreeOfThoughts:
 
         if not os.path.exists(PATH_TO_SAVE_DATA):
             os.makedirs(PATH_TO_SAVE_DATA)
-        json.dump(root.to_dict(),open(os.path.join(PATH_TO_SAVE_DATA,time.time()),'w'))
+        json.dump(root.to_dict(),open(os.path.join(PATH_TO_SAVE_DATA,str(time.time())),'w'))
 
         return root
 
@@ -402,12 +402,3 @@ def kth_occurrence_from_end(s: str, sub: str, k: int) -> int:
         if pos == -1:
             return -1
     return pos
-
-
-llm_instance = LLM('omrisap/Qwen2.5-1.5B_30K_COT_SFT')
-
-tot = TreeOfThoughts(llm_instance, max_depth=9, max_split_depth=34)
-problem_prompt = "Solve for x: 2x + 3 = 7"
-numerical_label = 2.0
-root = tot.expand_tree(problem_prompt, numerical_label)
-#
