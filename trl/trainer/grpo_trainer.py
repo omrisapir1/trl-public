@@ -1090,6 +1090,8 @@ class GRPOTrainer(Trainer):
             per_token_kl = (
                     torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
+        del input_ids
+        torch.cuda.empty_cache()
 
         # Compute the loss
         advantages = inputs["advantages"]
