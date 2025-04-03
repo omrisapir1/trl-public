@@ -477,7 +477,7 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.llm = LLM(
+                self.vllm_client = LLM(
                     model=model.name_or_path,
                     # tensor_parallel_size=2,
                     # device=vllm_device,
