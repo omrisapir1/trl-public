@@ -14,8 +14,8 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO_2", use_vllm=True,per_device_train_batch_size=1,sync_ref_model=True, ref_model_sync_steps=32,
-                           num_train_epochs=1,gradient_accumulation_steps=1,logging_steps=20,save_steps=1500)
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, ref_model_sync_steps=32,
+                           num_train_epochs=1,logging_steps=20,save_steps=1500)
 
 
 trainer = GRPOTrainer(
