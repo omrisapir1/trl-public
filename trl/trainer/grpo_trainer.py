@@ -316,7 +316,6 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            model_init_kwargs["device_map"] = "cuda:0"
             model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
         else:
             model_id = model.config._name_or_path
@@ -350,7 +349,7 @@ class GRPOTrainer(Trainer):
             # If PEFT configuration is not provided, create a reference model based on the initial model.
             self.ref_model = create_reference_model(model)
 
-        self.ref_model = self.ref_model.to('cuda:1')        # Processing class
+        # Processing class
         if processing_class is None:
             processing_class = AutoTokenizer.from_pretrained(model.config._name_or_path, padding_side="left")
 
@@ -482,8 +481,8 @@ class GRPOTrainer(Trainer):
                 self.vllm_client = LLM(
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
-                                device='cuda:1',
-                                gpu_memory_utilization=0.6,
+                                # device='cuda:1',
+                                gpu_memory_utilization=0.1,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=64,
 
@@ -635,12 +634,7 @@ class GRPOTrainer(Trainer):
     @profiling_decorator
     def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
         # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
-        try:
-            logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
-        except:
-            print(input_ids.device)
-            print(attention_mask.device)
-            raise
+        logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
         logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
 
         input_ids = input_ids[:, -logits_to_keep:]
@@ -650,6 +644,8 @@ class GRPOTrainer(Trainer):
         # Divide logits by sampling temperature.
         # See https://huggingface.co/blog/the_n_implementation_details_of_rlhf_with_ppo#policy-training-implementation-details
         logits = logits / self.temperature
+        print("Logits shape:", logits.shape)  # Expect [1, seq_len, vocab_size]
+        print("Input_ids shape before gather:", input_ids.shape)  # Expect [1, seq_len]
         return selective_log_softmax(logits, input_ids)  # compute logprobs for the input tokens
 
     @profiling_decorator
@@ -829,13 +825,13 @@ class GRPOTrainer(Trainer):
             batch_size = prompt_completion_ids.size(0)
             outputs = []
             for i in range(0, batch_size, max_chunk_size):
-                p_chunk = prompt_completion_ids[i:i + max_chunk_size]
-                m_chunk = attention_mask[i:i + max_chunk_size]
+                p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+                m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
                 with torch.no_grad():
                     sub_output = self._get_per_token_logps(
                         self.ref_model,
-                        p_chunk.to(self.ref_model.device),
-                        m_chunk.to(self.ref_model.device),
+                        p_chunk,
+                        m_chunk,
                         logits_to_keep
                     )
                 if sub_output is None:
@@ -1191,10 +1187,10 @@ class GRPOTrainer(Trainer):
                     new_lengths.append(actual_length)
 
                     # Trim the row to the effective length and add batch dimension.
-                    row_input_ids_trimmed = row_input_ids[:actual_length].unsqueeze(0).to(self.model.device)
+                    row_input_ids_trimmed = row_input_ids[:actual_length].unsqueeze(0).to(model.device)
                     # Create a new attention mask of ones for the trimmed sequence.
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
-                                                            device=self.model.device)
+                                                            device=model.device)
                     # Here, instead of computing logits_to_keep as size-1, we subtract 2.
                     row_logits_to_keep = row_input_ids_trimmed.size(1) - 2
                     # Now slice the input_ids: remove the first token, and only take row_logits_to_keep tokens.
@@ -1220,10 +1216,9 @@ class GRPOTrainer(Trainer):
                 print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
                 print("Sample row logits:", padded_outputs[0, 0, :10])
             else:
-                per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device),
-                                                            attention_mask.to(self.model.device), logits_to_keep)
+                per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
+                                                            attention_mask.to(model.device), logits_to_keep)
         except:
-            print(self.model.device)
             for inpt in input_ids:
                 print(self.tokenizer.decode(inpt))
             print(input_ids.shape)
@@ -1232,7 +1227,7 @@ class GRPOTrainer(Trainer):
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
-            ref_per_token_logps = inputs["ref_per_token_logps"].to(self.model.device)
+            ref_per_token_logps = inputs["ref_per_token_logps"].to(model.device)
             per_token_kl = (
                     torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
@@ -1240,7 +1235,7 @@ class GRPOTrainer(Trainer):
         # torch.cuda.empty_cache()
 
         # Compute the loss
-        advantages = inputs["advantages"].to(self.model.device)
+        advantages = inputs["advantages"].to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
         old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
@@ -1252,7 +1247,7 @@ class GRPOTrainer(Trainer):
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
 
-        loss = (per_token_loss * completion_mask.to(self.model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
+        loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_kl, ref_per_token_logps, per_token_logps
         torch.cuda.empty_cache()
         # Log the metrics
@@ -1296,7 +1291,7 @@ class GRPOTrainer(Trainer):
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
-            ref_per_token_logps = inputs["ref_per_token_logps"].to(self.model.device)
+            ref_per_token_logps = inputs["ref_per_token_logps"]
             per_token_kl = (
                 torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
