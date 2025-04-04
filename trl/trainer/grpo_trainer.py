@@ -1150,7 +1150,8 @@ class GRPOTrainer(Trainer):
             per_token_loss = per_token_loss + self.beta * per_token_kl
 
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
-
+        del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_kl, ref_per_token_logps, per_token_logps
+        torch.cuda.empty_cache()
         # Log the metrics
         # mode = "eval" if self.control.should_evaluate else "train"
 

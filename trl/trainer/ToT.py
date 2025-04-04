@@ -103,9 +103,9 @@ class TreeOfThoughts:
 
     CORRECT_STRUCTURE_REWARD = 0.1
     CORRECT_FLOAT_REWARD = 0.1
-    FIRST_SPLIT_COUNT = 2
+    FIRST_SPLIT_COUNT = 4
     MIN_THINK_TAG_SPLIT = 1
-    LAST_SPLIT = 3
+    LAST_SPLIT = 4
 
     def __init__(self, llm, max_depth: int = 9, max_split_depth: int = 34):
         self.llm = llm
