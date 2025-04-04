@@ -1109,18 +1109,18 @@ class GRPOTrainer(Trainer):
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
 
         # Log the metrics
-        mode = "eval" if self.control.should_evaluate else "train"
+        # mode = "eval" if self.control.should_evaluate else "train"
 
-        if self.beta != 0.0:
-            mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
-            self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
+        # if self.beta != 0.0:
+        #     mean_kl = (per_token_kl * completion_mask).sum() / MAX_TOKENS_TO_CALC_LOSS
+        #     self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
 
         # Compute the clip ratio
-        is_clipped = ((coef_1 < 1 - self.epsilon_low) & (advantages.unsqueeze(1) < 0)) | (
-                (coef_1 > 1 + self.epsilon_high) & (advantages.unsqueeze(1) > 0)
-        )
-        clip_ratio = (is_clipped * completion_mask).sum() / completion_mask.sum()
-        self._metrics[mode]["clip_ratio"].append(self.accelerator.gather_for_metrics(clip_ratio).mean().item())
+        # is_clipped = ((coef_1 < 1 - self.epsilon_low) & (advantages.unsqueeze(1) < 0)) | (
+        #         (coef_1 > 1 + self.epsilon_high) & (advantages.unsqueeze(1) > 0)
+        # )
+        # clip_ratio = (is_clipped * completion_mask).sum() / MAX_TOKENS_TO_CALC_LOSS
+        # self._metrics[mode]["clip_ratio"].append(self.accelerator.gather_for_metrics(clip_ratio).mean().item())
         return loss
 
 
