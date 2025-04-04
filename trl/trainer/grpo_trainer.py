@@ -1192,9 +1192,9 @@ class GRPOTrainer(Trainer):
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
                                                             device=model.device)
                     # Here, instead of computing logits_to_keep as size-1, we subtract 2.
-                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 2
+                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
                     # Now slice the input_ids: remove the first token, and only take row_logits_to_keep tokens.
-                    row_index = row_input_ids_trimmed[:, 1: row_logits_to_keep + 1]
+                    row_index = row_input_ids_trimmed[:, 1:]
 
                     print(
                         f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
