@@ -38,7 +38,7 @@ class TreeNode:
         self.stop_reason: Optional[StopReason] = None
         self._remove_logs()
 
-    def remove_logs(self):
+    def _remove_logs(self):
         if not os.path.exists(PATH_TO_SAVE_DATA):
             os.makedirs(PATH_TO_SAVE_DATA)
         for cur_f in os.listdir(PATH_TO_SAVE_DATA):
