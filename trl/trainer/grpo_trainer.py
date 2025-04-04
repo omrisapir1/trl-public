@@ -644,8 +644,6 @@ class GRPOTrainer(Trainer):
         # Divide logits by sampling temperature.
         # See https://huggingface.co/blog/the_n_implementation_details_of_rlhf_with_ppo#policy-training-implementation-details
         logits = logits / self.temperature
-        print("Logits shape:", logits.shape)  # Expect [1, seq_len, vocab_size]
-        print("Input_ids shape before gather:", input_ids.shape)  # Expect [1, seq_len]
         return selective_log_softmax(logits, input_ids)  # compute logprobs for the input tokens
 
     @profiling_decorator
@@ -1194,9 +1192,12 @@ class GRPOTrainer(Trainer):
                     if pad_len > 0:
                         padding = torch.full((1, pad_len), fill_value=0.0, device=device)
                         row_output = torch.cat([row_output, padding], dim=1)
+                        del padding
                     padded_outputs.append(row_output)
-
+                    del row_output
                 per_token_logps = torch.cat(padded_outputs, dim=0)
+                del padded_outputs
+                torch.cuda.empty_cache()
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
