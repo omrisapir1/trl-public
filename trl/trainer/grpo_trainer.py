@@ -735,12 +735,18 @@ class GRPOTrainer(Trainer):
             with self.compute_loss_context_manager():
                 # Compute a loss per group.
                 loss = self._compute_loss_for_group(model, group)
+                del group
 
 
                 # If no valid groups are present, return a dummy loss that requires grad.
                 if loss is not None and loss.requires_grad:
-                    self.accelerator.backward(loss, retain_graph=False)
-                    losses.append(loss.detach())
+                    try:
+                        self.accelerator.backward(loss, retain_graph=False)
+                        losses.append(loss.detach())
+                    except:
+                        print('OUT OF MEMORY')
+                        pass
+
                     torch.cuda.empty_cache()
         if not losses:
             loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
