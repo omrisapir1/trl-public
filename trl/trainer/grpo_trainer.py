@@ -482,7 +482,7 @@ class GRPOTrainer(Trainer):
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
-                                gpu_memory_utilization=0.15,
+                                gpu_memory_utilization=0.5,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=16,
 
@@ -734,15 +734,17 @@ class GRPOTrainer(Trainer):
         for i, group in enumerate(inputs):
             with self.compute_loss_context_manager():
                 # Compute a loss per group.
-                loss = self._compute_loss_for_group(model, group)
-                del group
+
 
 
                 # If no valid groups are present, return a dummy loss that requires grad.
                 if loss is not None and loss.requires_grad:
                     try:
+                        loss = self._compute_loss_for_group(model, group)
+                        del group
                         self.accelerator.backward(loss, retain_graph=False)
                         losses.append(loss.detach())
+                        del loss
                     except:
                         print('OUT OF MEMORY')
                         pass
