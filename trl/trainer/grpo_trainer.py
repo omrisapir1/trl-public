@@ -1291,7 +1291,7 @@ class GRPOTrainer(Trainer):
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
-            ref_per_token_logps = inputs["ref_per_token_logps"]
+            ref_per_token_logps = inputs["ref_per_token_logps"].to(self.model.device)
             per_token_kl = (
                 torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
