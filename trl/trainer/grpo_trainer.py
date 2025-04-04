@@ -635,7 +635,13 @@ class GRPOTrainer(Trainer):
     @profiling_decorator
     def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
         # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
-        logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
+        try:
+            logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
+        except:
+            print(model.device)
+            print(input_ids.device)
+            print(attention_mask.device)
+            raise
         logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
 
         input_ids = input_ids[:, -logits_to_keep:]
@@ -645,8 +651,6 @@ class GRPOTrainer(Trainer):
         # Divide logits by sampling temperature.
         # See https://huggingface.co/blog/the_n_implementation_details_of_rlhf_with_ppo#policy-training-implementation-details
         logits = logits / self.temperature
-        print("Logits shape:", logits.shape)  # Expect [1, seq_len, vocab_size]
-        print("Input_ids shape before gather:", input_ids.shape)  # Expect [1, seq_len]
         return selective_log_softmax(logits, input_ids)  # compute logprobs for the input tokens
 
     @profiling_decorator
