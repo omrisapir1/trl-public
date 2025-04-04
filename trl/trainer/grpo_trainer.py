@@ -1187,10 +1187,10 @@ class GRPOTrainer(Trainer):
                     new_lengths.append(actual_length)
 
                     # Trim the row to the effective length and add batch dimension.
-                    row_input_ids_trimmed = row_input_ids[:actual_length].unsqueeze(0).to(model.device)
+                    row_input_ids_trimmed = row_input_ids[:actual_length].unsqueeze(0).to(self.model.device)
                     # Create a new attention mask of ones for the trimmed sequence.
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
-                                                            device=model.device)
+                                                            device=self.model.device)
                     # Here, instead of computing logits_to_keep as size-1, we subtract 2.
                     row_logits_to_keep = row_input_ids_trimmed.size(1) - 2
                     # Now slice the input_ids: remove the first token, and only take row_logits_to_keep tokens.
@@ -1216,8 +1216,8 @@ class GRPOTrainer(Trainer):
                 print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
                 print("Sample row logits:", padded_outputs[0, 0, :10])
             else:
-                per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
-                                                            attention_mask.to(model.device), logits_to_keep)
+                per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device),
+                                                            attention_mask.to(self.model.device), logits_to_keep)
         except:
             for inpt in input_ids:
                 print(self.tokenizer.decode(inpt))
@@ -1227,7 +1227,7 @@ class GRPOTrainer(Trainer):
 
         # Compute the KL divergence between the model and the reference model
         if self.beta != 0.0:
-            ref_per_token_logps = inputs["ref_per_token_logps"].to(model.device)
+            ref_per_token_logps = inputs["ref_per_token_logps"].to(self.ref_model.device)
             per_token_kl = (
                     torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
             )
@@ -1235,7 +1235,7 @@ class GRPOTrainer(Trainer):
         # torch.cuda.empty_cache()
 
         # Compute the loss
-        advantages = inputs["advantages"].to(model.device)
+        advantages = inputs["advantages"].to(self.model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
         old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
@@ -1247,7 +1247,7 @@ class GRPOTrainer(Trainer):
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
 
-        loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
+        loss = (per_token_loss * completion_mask.to(self.model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_kl, ref_per_token_logps, per_token_logps
         torch.cuda.empty_cache()
         # Log the metrics

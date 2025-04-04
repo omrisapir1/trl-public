@@ -15,7 +15,7 @@ def dumy_func(completions, **kwargs):
     return
 
 training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, ref_model_sync_steps=32,
-                           num_train_epochs=1,logging_steps=20,save_steps=1500)
+                           num_train_epochs=1,logging_steps=20,save_steps=1500,vllm_device=1)
 
 
 trainer = GRPOTrainer(
