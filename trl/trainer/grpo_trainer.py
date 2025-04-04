@@ -1220,6 +1220,7 @@ class GRPOTrainer(Trainer):
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(self.model.device),
                                                             attention_mask.to(self.model.device), logits_to_keep)
         except:
+            print(self.model.device)
             for inpt in input_ids:
                 print(self.tokenizer.decode(inpt))
             print(input_ids.shape)
