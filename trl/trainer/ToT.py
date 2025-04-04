@@ -42,7 +42,10 @@ class TreeNode:
         if not os.path.exists(PATH_TO_SAVE_DATA):
             os.makedirs(PATH_TO_SAVE_DATA)
         for cur_f in os.listdir(PATH_TO_SAVE_DATA):
-            os.remove(os.path.join(PATH_TO_SAVE_DATA, cur_f))
+            try:
+                os.remove(os.path.join(PATH_TO_SAVE_DATA, cur_f))
+            except:
+                pass
 
     def to_dict(self) -> dict:
         return {
