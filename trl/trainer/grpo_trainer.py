@@ -1213,6 +1213,9 @@ class GRPOTrainer(Trainer):
                 per_token_logps = padded_outputs
                 print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
                 print("Sample row logits:", padded_outputs[0, 0, :10])
+            else:
+                per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
+                                                            attention_mask.to(model.device), logits_to_keep)
         except:
             for inpt in input_ids:
                 print(self.tokenizer.decode(inpt))
