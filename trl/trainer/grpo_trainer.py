@@ -742,10 +742,10 @@ class GRPOTrainer(Trainer):
                     self.accelerator.backward(loss, retain_graph=False)
                     losses.append(loss.detach())
                     torch.cuda.empty_cache()
-            if not losses:
-                loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
-            else:
-                loss = torch.stack(losses).mean()
+        if not losses:
+            loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
+        else:
+            loss = torch.stack(losses).mean()
 
         del inputs
         if (
