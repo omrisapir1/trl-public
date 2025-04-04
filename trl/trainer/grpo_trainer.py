@@ -1161,42 +1161,19 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         try:
-            chunk_threshold = 2000  # threshold on total elements
-            batch_size, seq_len = input_ids.shape
-            device = model.device
-            outputs = []
+            chunk_threshold = 1500  # total elements threshold
 
-            total_elements = batch_size * seq_len
+            total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
-                max_logps_len = 0
-                row_outputs = []
-
-                for i in range(batch_size):
-                    row_input_ids = input_ids[i:i + 1].to(device)
-                    row_attention_mask = torch.ones_like(row_input_ids).to(device)  # Override with all ones
-
-                    row_output = self._get_per_token_logps(
-                        model, row_input_ids, row_attention_mask, logits_to_keep
-                    )
-                    row_outputs.append(row_output)
-                    max_logps_len = max(max_logps_len, row_output.shape[1])
-
-                    del row_output
-                    torch.cuda.empty_cache()
-
-                # Pad all row outputs to the same length
-                padded_outputs = []
-                for row_output in row_outputs:
-                    pad_len = max_logps_len - row_output.shape[1]
-                    if pad_len > 0:
-                        padding = torch.full((1, pad_len), fill_value=0.0, device=device)
-                        row_output = torch.cat([row_output, padding], dim=1)
-                        del padding
-                    padded_outputs.append(row_output)
-                    del row_output
-                per_token_logps = torch.cat(padded_outputs, dim=0)
-                del padded_outputs
-                torch.cuda.empty_cache()
+                outputs = []
+                # Process each row separately
+                for i in range(input_ids.size(0)):
+                    row_input_ids = input_ids[i:i + 1].to(model.device)
+                    row_attention_mask = attention_mask[i:i + 1].to(model.device)
+                    # Compute per-token log probabilities for this row
+                    row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep)
+                    outputs.append(row_output)
+                per_token_logps = torch.cat(outputs, dim=0)
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
