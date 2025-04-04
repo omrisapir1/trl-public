@@ -23,6 +23,7 @@ import torch
 import torch.utils.data
 import transformers
 from accelerate.utils import broadcast_object_list, gather, gather_object, is_peft_model, set_seed
+from accelerate.utils.other import is_compiled_module
 from datasets import Dataset, IterableDataset
 from packaging import version
 from torch import nn
@@ -477,28 +478,29 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.vllm_client = VLLMClient(
-                    args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
-                )
+                self.vllm_client = LLM(
+                                model=model.name_or_path,
+                                # tensor_parallel_size=2,
+                                # device=vllm_device,
+                                gpu_memory_utilization=0.35,
+                                # dtype=torch.bfloat16,
+                                max_num_seqs=64,
+
+                                max_num_batched_tokens=48 * 1048,
+                                # trust_remote_code=True,
+
+                                # tensor_parallel_size=2,
+                                # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
+                                # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
+                                # This is particularly useful here because we generate completions from the same prompts.
+                                enable_prefix_caching=self.args.vllm_enable_prefix_caching,
+                                max_model_len=self.args.vllm_max_model_len,
+                            )
+            # VLLMClient(
+                #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
+                # )
                 #
-                #     LLM(
-                #     model=model.name_or_path,
-                #     # tensor_parallel_size=2,
-                #     # device=vllm_device,
-                #     gpu_memory_utilization=0.35,
-                #     # dtype=torch.bfloat16,
-                #     max_num_seqs=64,
-                #
-                #     max_num_batched_tokens=48 * 1048,
-                #     # trust_remote_code=True,
-                #
-                #     # tensor_parallel_size=2,
-                #     # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
-                #     # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
-                #     # This is particularly useful here because we generate completions from the same prompts.
-                #     enable_prefix_caching=self.args.vllm_enable_prefix_caching,
-                #     max_model_len=self.args.vllm_max_model_len,
-                # ))
+
                 # self.vllm_client = VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -646,44 +648,77 @@ class GRPOTrainer(Trainer):
 
     @profiling_decorator
     def _move_model_to_vllm(self):
-        # For DeepSpeed ZeRO-3, we need to gather all parameters before operations
-        deepspeed_plugin = self.accelerator.state.deepspeed_plugin
-        zero_stage_3 = deepspeed_plugin is not None and deepspeed_plugin.zero_stage == 3
-        gather_if_zero3 = deepspeed.zero.GatheredParameters if zero_stage_3 else nullcontext
+        with unwrap_model_for_generation(
+                self.model_wrapped, self.accelerator, gather_deepspeed3_params=self.args.ds3_gather_for_generation
+        ) as unwrapped_model:
+            if is_compiled_module(unwrapped_model):
+                unwrapped_model = unwrapped_model._orig_mod
+            if is_peft_model(unwrapped_model):
+                unwrapped_model.merge_adapter()
+                state_dict = unwrapped_model.state_dict()
+                # Remove base_model and base_layer prefixes
+                state_dict = {
+                    k.removeprefix("base_model.model.").replace(".base_layer", ""): v for k, v in state_dict.items()
+                }
+                # Remove values with adapter prefix (example: "_lora")
+                state_dict = {k: v for k, v in state_dict.items() if unwrapped_model.prefix not in k}
+                # When module to save, remove its prefix and discard the original module
+                state_dict = {
+                    k.replace("modules_to_save.default.", ""): v
+                    for k, v in state_dict.items()
+                    if "original_module" not in k
+                }
+            else:
+                state_dict = unwrapped_model.state_dict()
+            if self.accelerator.is_main_process:
+                llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+                llm_model.load_weights(state_dict.items())
 
-        if is_peft_model(self.model):
-            # With PEFT and DeepSpeed ZeRO Stage 3, we must gather the full model at once before merging, as merging
-            # adapters in a sharded manner is not supported.
-            with gather_if_zero3(list(self.model.parameters())):
-                self.model.merge_adapter()
-
-                # Update vLLM weights while parameters are gathered
-                for name, param in self.model.named_parameters():
-                    # When using PEFT, we need to recover the original parameter name and discard some parameters
-                    name = name.removeprefix("base_model.model.").replace(".base_layer", "")
-                    if self.model.prefix in name:
-                        continue
-                    # When module to save, remove its prefix and discard the original module
-                    if "original_module" in name:
-                        continue
-                    name = name.replace("modules_to_save.default.", "")
-
-                    if self.accelerator.is_main_process:
-                        self.vllm_client.update_named_param(name, param.data)
-
-                # Unmerge adapters while parameters are still gathered
-                self.model.unmerge_adapter()
-                # Parameters will automatically be repartitioned when exiting the context
-        else:
-            # For non-PEFT models, simply gather and update each parameter individually.
-            for name, param in self.model.named_parameters():
-                with gather_if_zero3([param]):
-                    if self.accelerator.is_main_process:
-                        self.vllm_client.update_named_param(name, param.data)
-
-        # Reset cache on main process
-        if self.accelerator.is_main_process:
-            self.vllm_client.reset_prefix_cache()
+            # Unmerge the adapter to restore the model to its original state.
+            # This must be done after loading weights to ensure they correspond to the merged state.
+            if is_peft_model(unwrapped_model):
+                unwrapped_model.unmerge_adapter()
+    #
+    # @profiling_decorator
+    # def _move_model_to_vllm(self):
+    #     # For DeepSpeed ZeRO-3, we need to gather all parameters before operations
+    #     deepspeed_plugin = self.accelerator.state.deepspeed_plugin
+    #     zero_stage_3 = deepspeed_plugin is not None and deepspeed_plugin.zero_stage == 3
+    #     gather_if_zero3 = deepspeed.zero.GatheredParameters if zero_stage_3 else nullcontext
+    #
+    #     if is_peft_model(self.model):
+    #         # With PEFT and DeepSpeed ZeRO Stage 3, we must gather the full model at once before merging, as merging
+    #         # adapters in a sharded manner is not supported.
+    #         with gather_if_zero3(list(self.model.parameters())):
+    #             self.model.merge_adapter()
+    #
+    #             # Update vLLM weights while parameters are gathered
+    #             for name, param in self.model.named_parameters():
+    #                 # When using PEFT, we need to recover the original parameter name and discard some parameters
+    #                 name = name.removeprefix("base_model.model.").replace(".base_layer", "")
+    #                 if self.model.prefix in name:
+    #                     continue
+    #                 # When module to save, remove its prefix and discard the original module
+    #                 if "original_module" in name:
+    #                     continue
+    #                 name = name.replace("modules_to_save.default.", "")
+    #
+    #                 if self.accelerator.is_main_process:
+    #                     self.vllm_client.update_named_param(name, param.data)
+    #
+    #             # Unmerge adapters while parameters are still gathered
+    #             self.model.unmerge_adapter()
+    #             # Parameters will automatically be repartitioned when exiting the context
+    #     else:
+    #         # For non-PEFT models, simply gather and update each parameter individually.
+    #         for name, param in self.model.named_parameters():
+    #             with gather_if_zero3([param]):
+    #                 if self.accelerator.is_main_process:
+    #                     self.vllm_client.update_named_param(name, param.data)
+    #
+    #     # Reset cache on main process
+    #     if self.accelerator.is_main_process:
+    #         self.vllm_client.reset_prefix_cache()
 
     @profiling_decorator
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
