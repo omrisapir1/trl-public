@@ -1164,57 +1164,39 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         try:
-            chunk_threshold = 2000  # total elements threshold
-            total_elements = input_ids.shape[0] * input_ids.shape[1]
+            chunk_threshold = 2000  # threshold on total elements
+            batch_size, seq_len = input_ids.shape
+            device = model.device
+            outputs = []
+
+            total_elements = batch_size * seq_len
             if total_elements > chunk_threshold:
-                print(attention_mask)
-                print(input_ids.shape)
-                outputs = []
-                new_lengths = []  # to record effective lengths for each row
+                max_logps_len = 0
+                row_outputs = []
 
-                pad_token_id = self.processing_class.pad_token_id
+                for i in range(batch_size):
+                    row_input_ids = input_ids[i:i + 1].to(device)
+                    row_attention_mask = torch.ones_like(row_input_ids).to(device)  # Override with all ones
 
-                # Process each row separately
-                for i in range(input_ids.size(0)):
-                    # Get the i-th row (shape: [seq_len])
-                    row_input_ids = input_ids[i]
-                    # Determine the actual sequence length by finding the last non-pad token.
-                    non_pad_indices = (row_input_ids != pad_token_id).nonzero(as_tuple=False)
-                    if non_pad_indices.numel() > 0:
-                        actual_length = non_pad_indices[-1].item() + 1
-                    else:
-                        actual_length = row_input_ids.size(0)
-                    new_lengths.append(actual_length)
+                    row_output = self._get_per_token_logps(
+                        model, row_input_ids, row_attention_mask, logits_to_keep
+                    )
+                    row_outputs.append(row_output)
+                    max_logps_len = max(max_logps_len, row_output.shape[1])
 
-                    # Trim the row to the effective length and add batch dimension.
-                    row_input_ids_trimmed = row_input_ids[:actual_length].unsqueeze(0).to(model.device)
-                    # Create a new attention mask of ones for the trimmed sequence.
-                    row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
-                                                            device=model.device)
-                    # Here, instead of computing logits_to_keep as size-1, we subtract 2.
-                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
-                    # Now slice the input_ids: remove the first token, and only take row_logits_to_keep tokens.
-                    row_index = row_input_ids_trimmed[:, 1:]
-
-                    print(
-                        f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
-                    print(f"[Row {i}] input_ids_trimmed shape:", row_input_ids_trimmed.shape)
-                    print(f"[Row {i}] attention_mask_trimmed shape:", row_attention_mask_trimmed.shape)
-                    print(f"[Row {i}] row_index shape:", row_index.shape)
-                    print(f"[Row {i}] logits_to_keep:", row_logits_to_keep)
-
-                    # Compute per-token log probabilities for this row.
-                    row_output = self._get_per_token_logps(model, row_index, row_attention_mask_trimmed,
-                                                           row_logits_to_keep)
-                    outputs.append(row_output)
-                    del row_output, row_input_ids_trimmed, row_attention_mask_trimmed, row_index
+                    del row_output
                     torch.cuda.empty_cache()
-                for o in outputs:
-                    print(o.shape)
-                padded_outputs = pad(outputs, padding_value=self.processing_class.pad_token_id, padding_side="right")
-                per_token_logps = padded_outputs
-                print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
-                print("Sample row logits:", padded_outputs[0, 0, :10])
+
+                # Pad all row outputs to the same length
+                padded_outputs = []
+                for row_output in row_outputs:
+                    pad_len = max_logps_len - row_output.shape[1]
+                    if pad_len > 0:
+                        padding = torch.full((1, pad_len), fill_value=0.0, device=device)
+                        row_output = torch.cat([row_output, padding], dim=1)
+                    padded_outputs.append(row_output)
+
+                per_token_logps = torch.cat(padded_outputs, dim=0)
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
