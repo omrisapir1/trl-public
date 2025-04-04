@@ -1133,9 +1133,12 @@ class GRPOTrainer(Trainer):
                     # Compute per-token log probabilities for this row
                     row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep)
                     outputs.append(row_output)
+                    del row_output
+                    torch.cuda.empty_cache()
+
 
                 per_token_logps = torch.cat(outputs, dim=0)
-                del outputs
+
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
