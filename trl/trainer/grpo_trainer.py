@@ -729,24 +729,23 @@ class GRPOTrainer(Trainer):
         # Prepare inputs: now returns a list of group dictionaries.
         inputs = self._prepare_inputs(inputs)
 
-
+        losses = []
         # Compute loss in micro-batches for each group.
-        with self.compute_loss_context_manager():
-            # Compute a loss per group.
-            group_losses = [self._compute_loss_for_group(model, group) for group in inputs]
+        for i, group in enumerate(inputs):
+            with self.compute_loss_context_manager():
+                # Compute a loss per group.
+                loss = self.compute_loss(model, group)
 
-            # If no valid groups are present, return a dummy loss that requires grad.
-            if not group_losses:
+
+                # If no valid groups are present, return a dummy loss that requires grad.
+                if loss is not None and loss.requires_grad:
+                    self.accelerator.backward(loss, retain_graph=False)
+                    losses.append(loss.detach())
+                    torch.cuda.empty_cache()
+            if not losses:
                 loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
             else:
-                # Aggregate loss (for logging/reporting) over groups.
-                loss = torch.stack(group_losses).mean()
-
-                # Micro-batch the backward pass: iterate over each group's loss.
-                for i, loss_chunk in enumerate(group_losses):
-                    # Retain graph for all chunks except the last one.
-                    retain_graph = (i < len(group_losses) - 1)
-                    self.accelerator.backward(loss_chunk, retain_graph=retain_graph)
+                loss = torch.stack(losses).mean()
 
         del inputs
         if (
