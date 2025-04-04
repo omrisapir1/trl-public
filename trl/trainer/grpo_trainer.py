@@ -733,7 +733,7 @@ class GRPOTrainer(Trainer):
         # Compute loss in micro-batches for each group.
         with self.compute_loss_context_manager():
             # Compute a loss per group.
-            group_losses = [self.compute_loss(model, group, num_items_in_batch=num_items_in_batch)
+            group_losses = [self._compute_loss_for_group(model, group, num_items_in_batch=num_items_in_batch)
                             for group in inputs]
 
             # If no valid groups are present, return a dummy loss that requires grad.
