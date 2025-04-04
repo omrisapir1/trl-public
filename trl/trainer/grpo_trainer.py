@@ -644,6 +644,8 @@ class GRPOTrainer(Trainer):
         # Divide logits by sampling temperature.
         # See https://huggingface.co/blog/the_n_implementation_details_of_rlhf_with_ppo#policy-training-implementation-details
         logits = logits / self.temperature
+        print("Logits shape:", logits.shape)  # Expect [1, seq_len, vocab_size]
+        print("Input_ids shape before gather:", input_ids.shape)  # Expect [1, seq_len]
         return selective_log_softmax(logits, input_ids)  # compute logprobs for the input tokens
 
     @profiling_decorator
@@ -1192,6 +1194,10 @@ class GRPOTrainer(Trainer):
                                                             device=model.device)
                     # Compute per-token log probabilities for this row.
                     row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
+                    print(f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
+                    print(f"[Row {i}] input_ids_trimmed shape:", row_input_ids_trimmed.shape)
+                    print(f"[Row {i}] attention_mask_trimmed shape:", row_attention_mask_trimmed.shape)
+                    print(f"[Row {i}] logits_to_keep:", row_logits_to_keep)
                     row_output = self._get_per_token_logps(model, row_input_ids_trimmed, row_attention_mask_trimmed,
                                                            row_logits_to_keep)
                     outputs.append(row_output)
@@ -1201,7 +1207,8 @@ class GRPOTrainer(Trainer):
                     print(o.shape)
                 padded_outputs = pad(outputs, padding_value=self.processing_class.pad_token_id, padding_side="right")
                 per_token_logps = padded_outputs
-                print(per_token_logps.shape)
+                print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
+                print("Sample row logits:", padded_outputs[0, 0, :10])
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
