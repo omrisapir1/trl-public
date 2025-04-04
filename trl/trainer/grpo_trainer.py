@@ -1163,7 +1163,6 @@ class GRPOTrainer(Trainer):
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
-
         try:
             chunk_threshold = 2000  # total elements threshold
             total_elements = input_ids.shape[0] * input_ids.shape[1]
@@ -1192,16 +1191,21 @@ class GRPOTrainer(Trainer):
                     # Create a new attention mask of ones for the trimmed sequence.
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
                                                             device=model.device)
-                    # Compute per-token log probabilities for this row.
+                    # For a causal model, we predict tokens from position 1 onward.
+                    # Thus, use row_input_ids_trimmed[:, 1:] as the target index.
+                    row_index = row_input_ids_trimmed[:, 1:]
+                    # Compute logits_to_keep as the trimmed length minus one.
                     row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
-                    print(f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
+                    print(
+                        f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
                     print(f"[Row {i}] input_ids_trimmed shape:", row_input_ids_trimmed.shape)
                     print(f"[Row {i}] attention_mask_trimmed shape:", row_attention_mask_trimmed.shape)
                     print(f"[Row {i}] logits_to_keep:", row_logits_to_keep)
-                    row_output = self._get_per_token_logps(model, row_input_ids_trimmed, row_attention_mask_trimmed,
+                    # Now pass the sliced row_index (of shape [1, L-1]) to _get_per_token_logps.
+                    row_output = self._get_per_token_logps(model, row_index, row_attention_mask_trimmed,
                                                            row_logits_to_keep)
                     outputs.append(row_output)
-                    del row_output, row_input_ids_trimmed, row_attention_mask_trimmed
+                    del row_output, row_input_ids_trimmed, row_attention_mask_trimmed, row_index
                     torch.cuda.empty_cache()
                 for o in outputs:
                     print(o.shape)
@@ -1209,9 +1213,6 @@ class GRPOTrainer(Trainer):
                 per_token_logps = padded_outputs
                 print("Final padded_outputs shape:", padded_outputs.shape)  # Expect [B, 1, max_len]
                 print("Sample row logits:", padded_outputs[0, 0, :10])
-            else:
-                per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
-                                                            attention_mask.to(model.device), logits_to_keep)
         except:
             for inpt in input_ids:
                 print(self.tokenizer.decode(inpt))
