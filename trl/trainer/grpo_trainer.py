@@ -483,7 +483,7 @@ class GRPOTrainer(Trainer):
                                 # tensor_parallel_size=2,
                                 # device=vllm_device,
                                 gpu_memory_utilization=0.35,
-                                # dtype=torch.bfloat16,
+                                dtype=torch.bfloat16,
                                 max_num_seqs=64,
 
                                 max_num_batched_tokens=48 * 1048,
