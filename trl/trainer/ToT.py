@@ -36,16 +36,6 @@ class TreeNode:
         self.completion_ids: List[int] = []
         self.next_split: Optional[int] = None
         self.stop_reason: Optional[StopReason] = None
-        self._remove_logs()
-
-    def _remove_logs(self):
-        if not os.path.exists(PATH_TO_SAVE_DATA):
-            os.makedirs(PATH_TO_SAVE_DATA)
-        for cur_f in os.listdir(PATH_TO_SAVE_DATA):
-            try:
-                os.remove(os.path.join(PATH_TO_SAVE_DATA, cur_f))
-            except:
-                pass
 
     def to_dict(self) -> dict:
         return {
@@ -150,6 +140,16 @@ class TreeOfThoughts:
             n=1,
             include_stop_str_in_output=True,
         )
+        self._remove_logs()
+
+    def _remove_logs(self):
+        if not os.path.exists(PATH_TO_SAVE_DATA):
+            os.makedirs(PATH_TO_SAVE_DATA)
+        for cur_f in os.listdir(PATH_TO_SAVE_DATA):
+            try:
+                os.remove(os.path.join(PATH_TO_SAVE_DATA, cur_f))
+            except:
+                pass
 
     def preprocess_problem(self, problem: str) -> str:
         """
