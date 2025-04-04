@@ -720,6 +720,48 @@ class GRPOTrainer(Trainer):
     #     if self.accelerator.is_main_process:
     #         self.vllm_client.reset_prefix_cache()
 
+    def training_step(self, model: nn.Module, inputs: dict[str, Union[torch.Tensor, Any]],
+                      num_items_in_batch=None) -> torch.Tensor:
+        model.train()
+        if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
+            self.optimizer.train()
+
+        # Prepare inputs: now returns a list of group dictionaries.
+        inputs = self._prepare_inputs(inputs)
+
+
+        # Compute loss in micro-batches for each group.
+        with self.compute_loss_context_manager():
+            # Compute a loss per group.
+            group_losses = [self.compute_loss(model, group, num_items_in_batch=num_items_in_batch)
+                            for group in inputs]
+
+            # If no valid groups are present, return a dummy loss that requires grad.
+            if not group_losses:
+                loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
+            else:
+                # Aggregate loss (for logging/reporting) over groups.
+                loss = torch.stack(group_losses).mean()
+
+                # Micro-batch the backward pass: iterate over each group's loss.
+                for i, loss_chunk in enumerate(group_losses):
+                    # Retain graph for all chunks except the last one.
+                    retain_graph = (i < len(group_losses) - 1)
+                    self.accelerator.backward(loss_chunk, retain_graph=retain_graph)
+
+        del inputs
+        if (
+                self.args.torch_empty_cache_steps is not None
+                and self.state.global_step % self.args.torch_empty_cache_steps == 0
+        ):
+            torch.cuda.empty_cache()
+
+        if self.args.n_gpu > 1:
+            loss = loss.mean()
+
+        # Note: With our micro-batched backward, we've already called backward on each group.
+        return loss.detach()
+
     @profiling_decorator
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
