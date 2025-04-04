@@ -349,7 +349,7 @@ class GRPOTrainer(Trainer):
             # If PEFT configuration is not provided, create a reference model based on the initial model.
             self.ref_model = create_reference_model(model)
 
-        # Processing class
+        self.ref_model = self.ref_model.to('cuda:1')        # Processing class
         if processing_class is None:
             processing_class = AutoTokenizer.from_pretrained(model.config._name_or_path, padding_side="left")
 
@@ -481,8 +481,8 @@ class GRPOTrainer(Trainer):
                 self.vllm_client = LLM(
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
-                                # device=vllm_device,
-                                gpu_memory_utilization=0.25,
+                                device='cuda:1',
+                                gpu_memory_utilization=0.6,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=64,
 
@@ -825,13 +825,13 @@ class GRPOTrainer(Trainer):
             batch_size = prompt_completion_ids.size(0)
             outputs = []
             for i in range(0, batch_size, max_chunk_size):
-                p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(device)
-                m_chunk = attention_mask[i:i + max_chunk_size].to(device)
+                p_chunk = prompt_completion_ids[i:i + max_chunk_size]
+                m_chunk = attention_mask[i:i + max_chunk_size]
                 with torch.no_grad():
                     sub_output = self._get_per_token_logps(
                         self.ref_model,
-                        p_chunk,
-                        m_chunk,
+                        p_chunk.to(self.ref_model.device),
+                        m_chunk.to(self.ref_model.device),
                         logits_to_keep
                     )
                 if sub_output is None:
@@ -1191,17 +1191,19 @@ class GRPOTrainer(Trainer):
                     # Create a new attention mask of ones for the trimmed sequence.
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
                                                             device=model.device)
-                    # For a causal model, we predict tokens from position 1 onward.
-                    # Thus, use row_input_ids_trimmed[:, 1:] as the target index.
-                    row_index = row_input_ids_trimmed[:, 1:]
-                    # Compute logits_to_keep as the trimmed length minus one.
-                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
+                    # Here, instead of computing logits_to_keep as size-1, we subtract 2.
+                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 2
+                    # Now slice the input_ids: remove the first token, and only take row_logits_to_keep tokens.
+                    row_index = row_input_ids_trimmed[:, 1: row_logits_to_keep + 1]
+
                     print(
                         f"Row {i}: total_len = {row_input_ids_trimmed.size(1)}, logits_to_keep = {row_logits_to_keep}")
                     print(f"[Row {i}] input_ids_trimmed shape:", row_input_ids_trimmed.shape)
                     print(f"[Row {i}] attention_mask_trimmed shape:", row_attention_mask_trimmed.shape)
+                    print(f"[Row {i}] row_index shape:", row_index.shape)
                     print(f"[Row {i}] logits_to_keep:", row_logits_to_keep)
-                    # Now pass the sliced row_index (of shape [1, L-1]) to _get_per_token_logps.
+
+                    # Compute per-token log probabilities for this row.
                     row_output = self._get_per_token_logps(model, row_index, row_attention_mask_trimmed,
                                                            row_logits_to_keep)
                     outputs.append(row_output)
