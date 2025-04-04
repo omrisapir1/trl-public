@@ -726,6 +726,8 @@ class GRPOTrainer(Trainer):
     def training_step(self, model: nn.Module, inputs: dict[str, Union[torch.Tensor, Any]],
                       num_items_in_batch=None) -> torch.Tensor:
         model.train()
+        if self.model.device != "cuda:0":
+            self.model.to('cuda:0')
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
 
