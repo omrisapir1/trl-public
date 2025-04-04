@@ -734,7 +734,7 @@ class GRPOTrainer(Trainer):
         for i, group in enumerate(inputs):
             with self.compute_loss_context_manager():
                 # Compute a loss per group.
-                loss = self.compute_loss(model, group)
+                loss = self._compute_loss_for_group(model, group)
 
 
                 # If no valid groups are present, return a dummy loss that requires grad.
