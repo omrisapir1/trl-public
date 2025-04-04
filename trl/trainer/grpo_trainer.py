@@ -1161,10 +1161,13 @@ class GRPOTrainer(Trainer):
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+
         try:
             chunk_threshold = 2000  # total elements threshold
             total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
+                print(attention_mask)
+                print(input_ids.shape)
                 outputs = []
                 new_lengths = []  # to record effective lengths for each row
 
@@ -1194,9 +1197,11 @@ class GRPOTrainer(Trainer):
                     outputs.append(row_output)
                     del row_output, row_input_ids_trimmed, row_attention_mask_trimmed
                     torch.cuda.empty_cache()
-
+                for o in outputs:
+                    print(o.shape)
                 padded_outputs = pad(outputs, padding_value=self.processing_class.pad_token_id, padding_side="right")
                 per_token_logps = padded_outputs
+                print(per_token_logps.shape)
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
