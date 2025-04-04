@@ -1188,7 +1188,7 @@ class GRPOTrainer(Trainer):
                     row_attention_mask_trimmed = torch.ones((1, actual_length), dtype=row_input_ids.dtype,
                                                             device=model.device)
                     # Compute per-token log probabilities for this row.
-                    row_logits_to_keep = row_input_ids_trimmed.size(1)
+                    row_logits_to_keep = row_input_ids_trimmed.size(1) - 1
                     row_output = self._get_per_token_logps(model, row_input_ids_trimmed, row_attention_mask_trimmed,
                                                            row_logits_to_keep)
                     outputs.append(row_output)
