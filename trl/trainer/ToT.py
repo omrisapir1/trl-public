@@ -36,6 +36,13 @@ class TreeNode:
         self.completion_ids: List[int] = []
         self.next_split: Optional[int] = None
         self.stop_reason: Optional[StopReason] = None
+        self._remove_logs()
+
+    def remove_logs(self):
+        if not os.path.exists(PATH_TO_SAVE_DATA):
+            os.makedirs(PATH_TO_SAVE_DATA)
+        for cur_f in os.listdir(PATH_TO_SAVE_DATA):
+            os.remove(os.path.join(PATH_TO_SAVE_DATA, cur_f))
 
     def to_dict(self) -> dict:
         return {
@@ -384,8 +391,6 @@ class TreeOfThoughts:
             if not node.is_terminal():
                 node.reward = np.mean(node.rewards)
 
-        if not os.path.exists(PATH_TO_SAVE_DATA):
-            os.makedirs(PATH_TO_SAVE_DATA)
         json.dump(root.to_dict(),open(os.path.join(PATH_TO_SAVE_DATA,str(time.time())),'w'))
 
         return root
