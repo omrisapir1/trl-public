@@ -1194,19 +1194,8 @@ class GRPOTrainer(Trainer):
                     del row_output, row_input_ids_trimmed, row_attention_mask_trimmed
                     torch.cuda.empty_cache()
 
-                # Pad each row's output to the maximum sequence length among all rows.
-                max_length = max(new_lengths)
-                padded_outputs = []
-                for out, length in zip(outputs, new_lengths):
-                    if length < max_length:
-                        pad_size = max_length - length
-                        # Assuming that padding with zeros is acceptable for log probabilities.
-                        pad_tensor = torch.zeros((1, pad_size), device=out.device, dtype=out.dtype)
-                        padded_out = torch.cat([out, pad_tensor], dim=1)
-                    else:
-                        padded_out = out
-                    padded_outputs.append(padded_out)
-                per_token_logps = torch.cat(padded_outputs, dim=0)
+                padded_outputs = pad(outputs, padding_value=self.processing_class.pad_token_id, padding_side="right")
+                per_token_logps = padded_outputs
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
