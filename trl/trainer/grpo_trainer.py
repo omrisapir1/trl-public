@@ -291,6 +291,7 @@ class GRPOTrainer(Trainer):
         peft_config: Optional["PeftConfig"] = None,
     ):
         # Args
+        self._n_gpu = 1
         if args is None:
             model_name = model if isinstance(model, str) else model.config._name_or_path
             model_name = model_name.split("/")[-1]
@@ -331,6 +332,8 @@ class GRPOTrainer(Trainer):
             model = get_peft_model(model, peft_config)
 
         # Enable gradient checkpointing if requested
+        self._n_gpu = 1
+        args.n_gpu = self._n_gpu
         if args.gradient_checkpointing:
             model = self._enable_gradient_checkpointing(model, args)
 
