@@ -439,8 +439,7 @@ class GRPOTrainer(Trainer):
         self.num_completions_to_print = args.num_completions_to_print
         from dataclasses import replace
         self.args = replace(args, _n_gpu=self._n_gpu)
-        print(args.n_gpu)
-        raise
+        
         super().__init__(
             model=model,
             args=args,
@@ -756,7 +755,7 @@ class GRPOTrainer(Trainer):
                         losses.append(loss.detach())
                         del loss
                 except:
-                    raise
+
                     print('OUT OF MEMORY')
                     pass
 
