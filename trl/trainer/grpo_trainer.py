@@ -918,7 +918,8 @@ class GRPOTrainer(Trainer):
             )
         #del
         # torch.cuda.empty_cache()
-        print(completion_ids)
+        for c in completion_ids:
+            print(self.tokenizer.decode(c))
         print(inputs["advantages"])
         # Compute the loss
         advantages = inputs["advantages"].to(model.device)
