@@ -437,7 +437,8 @@ class GRPOTrainer(Trainer):
         self._total_train_tokens = 0
         self.log_completions = args.log_completions
         self.num_completions_to_print = args.num_completions_to_print
-        object.__setattr__(args, "n_gpu", self._n_gpu)
+        from dataclasses import replace
+        self.args = replace(self.args, n_gpu=self._n_gpu)
         print(args.n_gpu)
         raise
         super().__init__(
