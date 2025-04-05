@@ -333,7 +333,7 @@ class GRPOTrainer(Trainer):
 
         # Enable gradient checkpointing if requested
         self._n_gpu = 1
-        args.n_gpu = self._n_gpu
+        args.__dict__["n_gpu"] = self._n_gpu
         if args.gradient_checkpointing:
             model = self._enable_gradient_checkpointing(model, args)
 
