@@ -144,6 +144,7 @@ class GRPOConfig(TrainingArguments):
     """
 
     # Parameters that control the model and reference model
+    _n_gpu: int = field(init=False, repr=False, default=-1)
     model_init_kwargs: Optional[dict] = field(
         default=None,
         metadata={
