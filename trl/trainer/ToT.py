@@ -299,7 +299,7 @@ class TreeOfThoughts:
                         if any([tag in full_text[:index] for tag in [self.ANSWER_START_TOKEN, self.THINK_START_TOKEN, self.ANSWER_END_TOKEN, self.THINK_END_TOKEN]]):
                             node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
                         else:
-                            index += self.ANSWER_START_TOKEN
+                            index += len(self.ANSWER_START_TOKEN)
                             extracted_text = full_text[:index]
                             node.completion_text = extracted_text
                             node.completion_ids = self.tokenizer.encode(extracted_text)
