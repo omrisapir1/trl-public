@@ -409,7 +409,7 @@ class TreeOfThoughts:
                     comp_idx += 1
                     completion = output.outputs[0]
                     text = completion.text
-                    stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text, numerical_label, initial=False, is_answering=is_answering)
+                    stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, numerical_label, initial=False, is_answering=is_answering)
                     print(stop_info)
                     print(text)
                     print(parent.prompt_text)
