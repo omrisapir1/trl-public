@@ -234,7 +234,7 @@ class TreeOfThoughts:
         if completion.stop_reason == self.ANSWER_END_TOKEN:
             result["to_stop"] = True
             result["stop_reason"] = StopReason.ANSWER_END_TOKEN
-            if self.ANSWER_START_TOKEN in text or self.ANSWER_START_TOKEN in prompt_text:
+            if (text.count(self.ANSWER_START_TOKEN) + prompt_text.count(self.ANSWER_START_TOKEN)) == 1:
                 reward = self.evaluate_solution(text, numerical_label) + self.CORRECT_STRUCTURE_REWARD if numerical_label is not None else self.CORRECT_STRUCTURE_REWARD
                 result["reward"] = reward
             else:
