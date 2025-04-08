@@ -316,10 +316,13 @@ class TreeOfThoughts:
                     index = kth_occurrence_from_end(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN,
                                                     max(int(np.ceil(thought_count / 2)), self.MIN_THINK_TAG_SPLIT))
                     if index != -1:
-                        index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                        extracted_text = full_text[:index]
-                        node.completion_text = extracted_text
-                        node.completion_ids = self.tokenizer.encode(extracted_text)
+                        if self.ANSWER_START_TOKEN in full_text[:index]:
+                            node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
+                        else:
+                            index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                            extracted_text = full_text[:index]
+                            node.completion_text = extracted_text
+                            node.completion_ids = self.tokenizer.encode(extracted_text)
                     else:
                         print(full_text)
                         raise
