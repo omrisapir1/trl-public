@@ -307,7 +307,7 @@ class TreeOfThoughts:
                     else:
                         node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
                     if node.state == NodeState.TERMINAL:
-                        extracted_text = full_text[:MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
+                        extracted_text = full_text[:self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
                         node.completion_text = extracted_text
                         node.completion_ids = self.tokenizer.encode(extracted_text)
 
@@ -406,6 +406,9 @@ class TreeOfThoughts:
                     completion = output.outputs[0]
                     text = completion.text
                     stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text, numerical_label, initial=False, is_answering=is_answering)
+                    print(stop_info)
+                    print(text)
+                    print(parent.prompt_text)
 
                     # Extend parent's completion text and token ids.
                     parent.completion_text += stop_info["text"]
