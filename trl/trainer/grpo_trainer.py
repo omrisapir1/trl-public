@@ -918,9 +918,7 @@ class GRPOTrainer(Trainer):
             )
         #del
         # torch.cuda.empty_cache()
-        for c in completion_ids:
-            print(len(c))
-        print(inputs["advantages"])
+
         # Compute the loss
         advantages = inputs["advantages"].to(model.device)
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
