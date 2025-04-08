@@ -292,7 +292,7 @@ class TreeOfThoughts:
             else:
                 valid_branch_found = True
                 thought_count = full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                node.next_split = result["next_split"]
+                node.next_split = stop_info["next_split"]
                 if thought_count == 0:
                     if self.ANSWER_START_TOKEN in full_text:
                         index = full_text.index(self.ANSWER_START_TOKEN)
