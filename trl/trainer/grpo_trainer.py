@@ -823,7 +823,7 @@ class GRPOTrainer(Trainer):
                 return  # Avoid dividing by near-zero std
 
             mean_r = sum(child_rewards) / len(child_rewards)
-            advantages = torch.tensor([(r - mean_r) / (std_r + 1e-9) for r in child_rewards])
+            advantages = torch.tensor([(r - mean_r) for r in child_rewards]) # / (std_r + 1e-9)
 
             # Gather IDs
             prompt_ids = torch.stack([torch.tensor(c.prompt_ids) for c in child_nodes], dim=0)
@@ -898,6 +898,8 @@ class GRPOTrainer(Trainer):
                     # Compute per-token log probabilities for this row
                     row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep)
                     outputs.append(row_output)
+                    del row_output, row_attention_mask, row_input_ids
+                    torch.cuda.empty_cache()
                 per_token_logps = torch.cat(outputs, dim=0)
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
@@ -931,7 +933,7 @@ class GRPOTrainer(Trainer):
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
-        loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
+        loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_kl, ref_per_token_logps, per_token_logps
         torch.cuda.empty_cache()
         # Log the metrics
