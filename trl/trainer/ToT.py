@@ -36,6 +36,7 @@ class TreeNode:
         self.completion_ids: List[int] = []
         self.next_split: Optional[int] = None
         self.stop_reason: Optional[StopReason] = None
+        self.truncated: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -449,6 +450,13 @@ class TreeOfThoughts:
         for node in self.get_all_nodes(root):
             if not node.is_terminal():
                 node.reward = np.mean(node.rewards)
+            if len(node.completion_ids) > self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR:
+                node.completion_ids = node.completion_ids[:self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
+                node.truncated = True
+                print('TRUNCATED!!!\n\n')
+                print(node.to_dict())
+                print('TO')
+                print(self.tokenizer.decoce(node.completion_ids))
 
         json.dump(root.to_dict(),open(os.path.join(PATH_TO_SAVE_DATA,str(time.time())),'w'))
 
