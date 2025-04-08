@@ -487,8 +487,8 @@ class GRPOTrainer(Trainer):
                 self.vllm_client = LLM(
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
-                                device='cuda:1',
-                                gpu_memory_utilization=0.6,
+                                # device='cuda:1',
+                                gpu_memory_utilization=0.2,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=16,
 
