@@ -225,7 +225,7 @@ class TreeOfThoughts:
             return result
 
 
-        if is_answering and (completion.stop_reason != self.ANSWER_END_TOKEN or any([t in text for t in [self.THINK_END_TOKEN, self.ANSWER_START_TOKEN, self.THINK_START_TOKEN]])):
+        if is_answering and (completion.stop_reason != self.ANSWER_END_TOKEN or any([t in text for t in [self.THINK_END_TOKEN, self.THINK_START_TOKEN]])):
             result["to_stop"] = True
             result["reward"] = 0
             result["stop_reason"] = StopReason.INVALID_STRUCTURE
