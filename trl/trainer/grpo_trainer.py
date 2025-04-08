@@ -760,7 +760,7 @@ class GRPOTrainer(Trainer):
                 except:
 
                     print('OUT OF MEMORY')
-                    raise
+
                     pass
 
                     torch.cuda.empty_cache()
@@ -887,7 +887,7 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         try:
-            chunk_threshold = 1500  # total elements threshold
+            chunk_threshold = 2000  # total elements threshold
 
             total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
@@ -897,11 +897,11 @@ class GRPOTrainer(Trainer):
                     row_input_ids = input_ids[i:i + 1].to(model.device)
                     row_attention_mask = attention_mask[i:i + 1].to(model.device)
                     # Compute per-token log probabilities for this row
-                    row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep)
+                    row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep).to('cpu')
                     outputs.append(row_output)
                     del row_output, row_attention_mask, row_input_ids
                     torch.cuda.empty_cache()
-                per_token_logps = torch.cat(outputs, dim=0)
+                per_token_logps = torch.cat(outputs, dim=0).to(model.device)
             else:
                 per_token_logps = self._get_per_token_logps(model, input_ids.to(model.device),
                                                             attention_mask.to(model.device), logits_to_keep)
