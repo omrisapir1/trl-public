@@ -456,7 +456,7 @@ class TreeOfThoughts:
                 print('TRUNCATED!!!\n\n')
                 print(node.to_dict())
                 print('TO')
-                print(self.tokenizer.decoce(node.completion_ids))
+                print(self.tokenizer.decode(node.completion_ids))
 
         json.dump(root.to_dict(),open(os.path.join(PATH_TO_SAVE_DATA,str(time.time())),'w'))
 
