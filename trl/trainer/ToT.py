@@ -290,7 +290,6 @@ class TreeOfThoughts:
             if stop_info["to_stop"]:
                 node.mark_terminal(stop_info["reward"], stop_info["stop_reason"])
             else:
-                valid_branch_found = True
                 thought_count = full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
                 node.next_split = stop_info["next_split"]
                 if thought_count == 0:
@@ -299,6 +298,7 @@ class TreeOfThoughts:
                         if any([tag in full_text[:index] for tag in [self.ANSWER_START_TOKEN, self.THINK_START_TOKEN, self.ANSWER_END_TOKEN, self.THINK_END_TOKEN]]):
                             node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
                         else:
+                            valid_branch_found = True
                             index += len(self.ANSWER_START_TOKEN)
                             extracted_text = full_text[:index]
                             node.completion_text = extracted_text
@@ -312,6 +312,7 @@ class TreeOfThoughts:
                         node.completion_ids = self.tokenizer.encode(extracted_text)
 
                 else:
+                    valid_branch_found = True
                     index = kth_occurrence_from_end(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN,
                                                     max(int(np.ceil(thought_count / 2)), self.MIN_THINK_TAG_SPLIT))
                     if index != -1:
