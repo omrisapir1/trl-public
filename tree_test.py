@@ -6,7 +6,7 @@ import random
 
 
 df = pd.read_pickle('15K_TRPO_trainset.pkl')[['problem','numerical_solution']]
-df = df.iloc[5000:5010]
+df = df.iloc[:4500]
 hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 
 
@@ -14,8 +14,7 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, ref_model_sync_steps=32,
-                           num_train_epochs=1,logging_steps=20,save_steps=1500,_n_gpu=1,vllm_device=1)
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, num_train_epochs=1,logging_steps=20,save_steps=1500,_n_gpu=1,vllm_device=1)
 
 
 trainer = GRPOTrainer(

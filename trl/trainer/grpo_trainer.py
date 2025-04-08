@@ -351,7 +351,7 @@ class GRPOTrainer(Trainer):
         else:
             # If PEFT configuration is not provided, create a reference model based on the initial model.
             self.ref_model = create_reference_model(model)
-        self.ref_model = self.ref_model.to('cuda:1')
+        # self.ref_model = self.ref_model.to('cuda:1')
 
         # Processing class
         if processing_class is None:
