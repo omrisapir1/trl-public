@@ -454,7 +454,8 @@ class TreeOfThoughts:
                 node.completion_ids = node.completion_ids[:self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
                 node.truncated = True
                 print('TRUNCATED!!!\n\n')
-                print(node.to_dict())
+                node_as_dict = node.to_dict()
+                print({k:node_as_dict.get(k) for k in ['prompt_text', 'completion_text', 'state', 'truncated','reward','rewards','depth','stop_reason', 'next_split']})
                 print('TO')
                 print(self.tokenizer.decode(node.completion_ids))
 
