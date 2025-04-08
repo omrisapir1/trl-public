@@ -931,8 +931,6 @@ class GRPOTrainer(Trainer):
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
-        print(per_token_loss1.shape)
-        print(per_token_loss1)
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / MAX_TOKENS_TO_CALC_LOSS
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_kl, ref_per_token_logps, per_token_logps
         torch.cuda.empty_cache()
@@ -960,7 +958,6 @@ class GRPOTrainer(Trainer):
             if not group_losses:
                 print("No valid groups for loss computation in this batch.")
                 return torch.zeros(1, device=self.accelerator.device, requires_grad=True)
-            print(group_losses)
             loss = torch.stack(group_losses).mean()
             return loss
         if return_outputs:
