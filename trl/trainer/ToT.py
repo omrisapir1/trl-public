@@ -410,10 +410,6 @@ class TreeOfThoughts:
                     completion = output.outputs[0]
                     text = completion.text
                     stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, numerical_label, initial=False, is_answering=is_answering)
-                    print(stop_info)
-                    print(text)
-                    print(parent.prompt_text)
-
                     # Extend parent's completion text and token ids.
                     parent.completion_text += stop_info["text"]
                     parent.completion_ids += completion.token_ids
