@@ -760,6 +760,7 @@ class GRPOTrainer(Trainer):
                 except:
 
                     print('OUT OF MEMORY')
+                    raise
                     pass
 
                     torch.cuda.empty_cache()
