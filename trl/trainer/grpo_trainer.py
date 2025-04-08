@@ -897,7 +897,7 @@ class GRPOTrainer(Trainer):
                     row_input_ids = input_ids[i:i + 1].to(model.device)
                     row_attention_mask = attention_mask[i:i + 1].to(model.device)
                     # Compute per-token log probabilities for this row
-                    row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep).to('cpu')
+                    row_output = self._get_per_token_logps(model, row_input_ids, row_attention_mask, logits_to_keep)
                     outputs.append(row_output)
                     del row_output, row_attention_mask, row_input_ids
                     torch.cuda.empty_cache()
