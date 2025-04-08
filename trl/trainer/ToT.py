@@ -92,7 +92,9 @@ class TreeOfThoughts:
     END_OF_TEXT_ID_TOKEN = 151643
 
     MAX_THINK_TOKENS = 512
-    MAX_FIRST_ANS_TOKENS = 1500
+    MAX_MID_TO_FINAL_TOKENS = 1524
+    MAX_FIRST_ANS_TOKENS = 2200
+    MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
 
     CORRECT_STRUCTURE_REWARD = 0.1
     CORRECT_FLOAT_REWARD = 0.1
@@ -100,7 +102,7 @@ class TreeOfThoughts:
     MIN_THINK_TAG_SPLIT = 1
     LAST_SPLIT = 4
 
-    def __init__(self, llm, max_depth: int = 9, max_split_depth: int = 34):
+    def __init__(self, llm, max_depth: int = 3, max_split_depth: int = 34):
         self.llm = llm
         self.max_depth = max_depth
         self.max_split_depth = max_split_depth
@@ -115,6 +117,17 @@ class TreeOfThoughts:
             repetition_penalty=1.0,
             skip_special_tokens=False,
             stop=[self.THINK_END_TOKEN, self.ANSWER_END_TOKEN, self.ANSWER_START_TOKEN],
+            n=1,
+            include_stop_str_in_output=True,
+        )
+        self.mid_to_end_sampling_params = SamplingParams(
+            temperature=0.9,
+            max_tokens=self.MAX_MID_TO_FINAL_TOKENS,
+            top_p=1.0,
+            top_k=50,
+            repetition_penalty=1.0,
+            skip_special_tokens=False,
+            stop=[self.ANSWER_END_TOKEN, self.ANSWER_START_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -136,7 +149,7 @@ class TreeOfThoughts:
             top_k=50,
             repetition_penalty=1.0,
             skip_special_tokens=False,
-            stop=[self.ANSWER_START_TOKEN, self.ANSWER_END_TOKEN],
+            stop=[self.ANSWER_END_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -201,11 +214,17 @@ class TreeOfThoughts:
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
             return result
 
-        if initial and (self.ANSWER_END_TOKEN in text or (completion.stop_reason is not None and completion.stop_reason != self.ANSWER_START_TOKEN)):
-            result["to_stop"] = True
-            result["reward"] = 0
-            result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
+        # if initial and (self.ANSWER_END_TOKEN in text or (completion.stop_reason is not None and completion.stop_reason != self.ANSWER_START_TOKEN)):
+        #     result["to_stop"] = True
+        #     result["reward"] = 0
+        #     result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
+        #     return result
+
+        if initial and completion.stop_reason == self.ANSWER_END_TOKEN:
+            result["next_split"] = self.LAST_SPLIT
             return result
+
+
         if is_answering and (completion.stop_reason != self.ANSWER_END_TOKEN or any([t in text for t in [self.THINK_END_TOKEN, self.ANSWER_START_TOKEN, self.THINK_START_TOKEN]])):
             result["to_stop"] = True
             result["reward"] = 0
@@ -222,7 +241,7 @@ class TreeOfThoughts:
                 result["reward"] = 0
             return result
         if completion.stop_reason == self.ANSWER_START_TOKEN:
-            result["next_split"] = self.LAST_SPLIT
+            result["next_split"] = 1#self.LAST_SPLIT
             return result
         if completion.stop_reason == self.THINK_END_TOKEN:
             return result
@@ -272,10 +291,43 @@ class TreeOfThoughts:
                 node.mark_terminal(stop_info["reward"], stop_info["stop_reason"])
             else:
                 valid_branch_found = True
-                thought_count = full_text.count(self.THINK_END_TOKEN)
+                thought_count = full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                node.next_split = result["next_split"]
+                if thought_count == 0:
+                    if self.ANSWER_START_TOKEN in full_text:
+                        index = full_text.index(self.ANSWER_START_TOKEN)
+                        if any([tag in full_text[:index] for tag in [self.ANSWER_START_TOKEN, self.THINK_START_TOKEN, self.ANSWER_END_TOKEN, self.THINK_END_TOKEN]]):
+                            node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
+                        else:
+                            index += self.ANSWER_START_TOKEN
+                            extracted_text = full_text[:index]
+                            node.completion_text = extracted_text
+                            node.completion_ids = self.tokenizer.encode(extracted_text)
+                            node.state = NodeState.ANSWERING
+                    else:
+                        node.mark_terminal(0, StopReason.INVALID_STRUCTURE)
+                    if node.state == NodeState.TERMINAL:
+                        extracted_text = full_text[:MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
+                        node.completion_text = extracted_text
+                        node.completion_ids = self.tokenizer.encode(extracted_text)
 
-                node.state = NodeState.ANSWERING
-                node.next_split = stop_info["next_split"]
+                else:
+                    index = kth_occurrence_from_end(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN,
+                                                    max(int(np.ceil(thought_count / 2)), self.MIN_THINK_TAG_SPLIT))
+                    if index != -1:
+                        index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                        extracted_text = full_text[:index]
+                        node.completion_text = extracted_text
+                        node.completion_ids = self.tokenizer.encode(extracted_text)
+                    else:
+                        print(full_text)
+                        raise
+
+
+
+
+                # node.state = NodeState.ANSWERING
+                # node.next_split = stop_info["next_split"]
                 #
                 # if thought_count:
                 #
@@ -340,7 +392,8 @@ class TreeOfThoughts:
             if not mapping:
                 break
 
-            sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
+            # sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
+            sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.mid_to_end_sampling_params
             outputs = self.llm.generate(batch_prompts, sampling)
             comp_idx = 0
 
