@@ -488,7 +488,7 @@ class GRPOTrainer(Trainer):
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
-                                gpu_memory_utilization=0.15,
+                                gpu_memory_utilization=0.3,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=16,
 
@@ -730,6 +730,7 @@ class GRPOTrainer(Trainer):
 
     def training_step(self, model: nn.Module, inputs: dict[str, Union[torch.Tensor, Any]],
                       num_items_in_batch=None) -> torch.Tensor:
+
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
@@ -839,7 +840,7 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
 
             # Chunked ref log prob computation (memory-safe)
-            max_chunk_size = 4
+            max_chunk_size = 2
             batch_size = prompt_completion_ids.size(0)
             outputs = []
             for i in range(0, batch_size, max_chunk_size):
@@ -886,7 +887,7 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         try:
-            chunk_threshold = 20000  # total elements threshold
+            chunk_threshold = 2000  # total elements threshold
 
             total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
