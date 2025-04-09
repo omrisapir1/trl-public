@@ -99,7 +99,6 @@ class TreeOfThoughts:
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
 
     CORRECT_STRUCTURE_REWARD = 0.1
-    CORRECT_FLOAT_REWARD = 0.1
     FIRST_SPLIT_COUNT = 4
     MIN_THINK_TAG_SPLIT = 1
     LAST_SPLIT = 4
@@ -262,7 +261,6 @@ class TreeOfThoughts:
             if extracted.replace('.', '', 1).replace('-', '', 1).isdigit():
                 try:
                     value = float(extracted)
-                    total_reward += self.CORRECT_FLOAT_REWARD
                     total_reward += 1 if value == float(numerical_label) else 0
                     return total_reward
                 except ValueError:
