@@ -1,5 +1,6 @@
 import json
 import os.path
+import random
 import time
 import re
 from enum import Enum
@@ -98,11 +99,16 @@ class TreeOfThoughts:
     MAX_FIRST_ANS_TOKENS = 2200
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
 
-    CORRECT_STRUCTURE_REWARD = 0.0
+    CORRECT_STRUCTURE_REWARD = 0.1
     FIRST_SPLIT_COUNT = 4
     MIN_THINK_TAG_SPLIT = 1
-    LAST_SPLIT = 2
-    MID_SPLIT = 3
+    LAST_SPLIT = 4
+    LAST_SPLIT_PROB = 0.25
+    MID_SPLIT = 4
+    MID_SPLIT_PROB = 0.5
+
+    NON_SPLIT = 1
+
 
     def __init__(self, llm, max_depth: int = 3, max_split_depth: int = 34):
         self.llm = llm
@@ -243,7 +249,7 @@ class TreeOfThoughts:
                 result["reward"] = 0
             return result
         if completion.stop_reason == self.ANSWER_START_TOKEN:
-            result["next_split"] = self.LAST_SPLIT
+            result["next_split"] = self.LAST_SPLIT if random.random() < self.LAST_SPLIT_PROB else self.NON_SPLIT
             return result
         if completion.stop_reason == self.THINK_END_TOKEN:
             return result
@@ -324,7 +330,7 @@ class TreeOfThoughts:
                             extracted_text = full_text[:index]
                             node.completion_text = extracted_text
                             node.completion_ids = self.tokenizer.encode(extracted_text)
-                            node.next_split = self.MID_SPLIT
+                            node.next_split = self.MID_SPLIT if random.random() < 0.5 else self.NON_SPLIT
                     else:
                         print(full_text)
                         raise
