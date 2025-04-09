@@ -886,7 +886,7 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         try:
-            chunk_threshold = 2000  # total elements threshold
+            chunk_threshold = 20000  # total elements threshold
 
             total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
