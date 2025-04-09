@@ -51,6 +51,7 @@ class TreeNode:
             "next_split": self.next_split,
             "stop_reason": self.stop_reason.name if self.stop_reason else None,
             "children": [child.to_dict() for child in self.children],
+            "truncated": self.truncated,
         }
 
     def add_child(self, child_node: 'TreeNode'):
@@ -242,7 +243,7 @@ class TreeOfThoughts:
                 result["reward"] = 0
             return result
         if completion.stop_reason == self.ANSWER_START_TOKEN:
-            result["next_split"] = 1#self.LAST_SPLIT
+            result["next_split"] = self.LAST_SPLIT
             return result
         if completion.stop_reason == self.THINK_END_TOKEN:
             return result
