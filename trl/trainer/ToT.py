@@ -101,7 +101,8 @@ class TreeOfThoughts:
     CORRECT_STRUCTURE_REWARD = 0.1
     FIRST_SPLIT_COUNT = 4
     MIN_THINK_TAG_SPLIT = 1
-    LAST_SPLIT = 4
+    LAST_SPLIT = 2
+    MID_SPLIT = 3
 
     def __init__(self, llm, max_depth: int = 3, max_split_depth: int = 34):
         self.llm = llm
@@ -323,6 +324,7 @@ class TreeOfThoughts:
                             extracted_text = full_text[:index]
                             node.completion_text = extracted_text
                             node.completion_ids = self.tokenizer.encode(extracted_text)
+                            node.next_split = self.MID_SPLIT
                     else:
                         print(full_text)
                         raise
