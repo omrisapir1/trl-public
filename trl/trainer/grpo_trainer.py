@@ -730,7 +730,6 @@ class GRPOTrainer(Trainer):
 
     def training_step(self, model: nn.Module, inputs: dict[str, Union[torch.Tensor, Any]],
                       num_items_in_batch=None) -> torch.Tensor:
-        model = model.to('cuda:0')
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
@@ -840,7 +839,7 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
 
             # Chunked ref log prob computation (memory-safe)
-            max_chunk_size = 2
+            max_chunk_size = 4
             batch_size = prompt_completion_ids.size(0)
             outputs = []
             for i in range(0, batch_size, max_chunk_size):
