@@ -280,7 +280,7 @@ class TreeOfThoughts:
         Generate the first set of child nodes from the root.
         """
         full_prompt = root.prompt_text
-        prompts = [full_prompt] * self.FIRST_SPLIT_COUNT if random.random() < self.FIRST_SPLIT_PROB else self.NON_SPLIT_COUNT
+        prompts = [full_prompt] * (self.FIRST_SPLIT_COUNT if random.random() < self.FIRST_SPLIT_PROB else self.NON_SPLIT_COUNT)
         outputs = self.llm.generate(prompts, self.first_answer_params)
         first_level_nodes = []
         valid_branch_found = False
