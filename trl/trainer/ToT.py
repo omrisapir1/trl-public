@@ -101,13 +101,14 @@ class TreeOfThoughts:
 
     CORRECT_STRUCTURE_REWARD = 0.1
     FIRST_SPLIT_COUNT = 4
+    FIRST_SPLIT_PROB = 0.25
     MIN_THINK_TAG_SPLIT = 1
-    LAST_SPLIT = 4
-    LAST_SPLIT_PROB = 0.25
-    MID_SPLIT = 4
+    LAST_SPLIT_COUNT = 4
+    LAST_SPLIT_PROB = 1
+    MID_SPLIT_COUNT = 4
     MID_SPLIT_PROB = 0.5
 
-    NON_SPLIT = 1
+    NON_SPLIT_COUNT = 1
 
 
     def __init__(self, llm, max_depth: int = 3, max_split_depth: int = 34):
@@ -229,7 +230,7 @@ class TreeOfThoughts:
         #     return result
 
         if initial and completion.stop_reason == self.ANSWER_END_TOKEN:
-            result["next_split"] = self.LAST_SPLIT
+            result["next_split"] = self.LAST_SPLIT_COUNT
             return result
 
 
@@ -249,7 +250,7 @@ class TreeOfThoughts:
                 result["reward"] = 0
             return result
         if completion.stop_reason == self.ANSWER_START_TOKEN:
-            result["next_split"] = self.LAST_SPLIT if random.random() < self.LAST_SPLIT_PROB else self.NON_SPLIT
+            result["next_split"] = self.LAST_SPLIT_COUNT if random.random() < self.LAST_SPLIT_PROB else self.NON_SPLIT_COUNT
             return result
         if completion.stop_reason == self.THINK_END_TOKEN:
             return result
@@ -279,7 +280,7 @@ class TreeOfThoughts:
         Generate the first set of child nodes from the root.
         """
         full_prompt = root.prompt_text
-        prompts = [full_prompt] * self.FIRST_SPLIT_COUNT
+        prompts = [full_prompt] * self.FIRST_SPLIT_COUNT if random.random() < self.FIRST_SPLIT_PROB else self.NON_SPLIT_COUNT
         outputs = self.llm.generate(prompts, self.first_answer_params)
         first_level_nodes = []
         valid_branch_found = False
@@ -330,7 +331,7 @@ class TreeOfThoughts:
                             extracted_text = full_text[:index]
                             node.completion_text = extracted_text
                             node.completion_ids = self.tokenizer.encode(extracted_text)
-                            node.next_split = self.MID_SPLIT if random.random() < 0.5 else self.NON_SPLIT
+                            node.next_split = self.MID_SPLIT_COUNT if random.random() < 0.5 else self.NON_SPLIT_COUNT
                     else:
                         print(full_text)
                         raise
