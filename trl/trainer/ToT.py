@@ -193,7 +193,7 @@ class TreeOfThoughts:
 
         if node.is_terminal():
             return 0
-        elif node.depth < self.max_split_depth:
+        elif node.depth < (self.max_split_depth-1):
             if node.state == NodeState.ANSWERING:
                 return 0
             return self.MID_SPLIT_COUNT
@@ -389,7 +389,7 @@ class TreeOfThoughts:
 
 
         current_depth = 1
-        self.max_depth = self.max_split_depth + 2
+        self.max_depth = self.max_split_depth + 1
         print('max_depth', self.max_depth)
         while current_depth <= self.max_depth:
             active_nodes = [node for node in self.get_all_nodes(root) if node.depth == current_depth and not node.is_terminal()]
