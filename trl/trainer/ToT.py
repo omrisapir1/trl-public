@@ -352,6 +352,8 @@ class TreeOfThoughts:
 
             root.add_child(node)
             first_level_nodes.append(node)
+        if not valid_branch_found:
+            return []
 
         if thought_count <= self.SPLIT_LEVELS[0]:
             self.max_split_depth = self.SPLIT_COUNTES[0]
@@ -362,8 +364,7 @@ class TreeOfThoughts:
         else:
             self.max_split_depth = self.SPLIT_COUNTES[-1]
 
-
-        return first_level_nodes if valid_branch_found else []
+        return first_level_nodes
 
     def expand_tree(self, problem: str, numerical_label: float) -> TreeNode:
         """
