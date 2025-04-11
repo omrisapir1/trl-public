@@ -414,6 +414,7 @@ class TreeOfThoughts:
 
 
             if not mapping:
+                current_depth += 1
                 continue
 
             # sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
