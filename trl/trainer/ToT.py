@@ -412,9 +412,9 @@ class TreeOfThoughts:
                 elif not node.is_terminal():
                     node.depth += 1
 
-
+            current_depth += 1
             if not mapping:
-                current_depth += 1
+
                 continue
 
             # sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
@@ -461,7 +461,6 @@ class TreeOfThoughts:
 
                     parent.add_child(child)
 
-            current_depth += 1
 
         # Propagate rewards upward from terminal nodes.
         for node in self.get_all_nodes(root):
