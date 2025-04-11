@@ -402,6 +402,7 @@ class TreeOfThoughts:
                 #     terminal_nodes.append(node)
                 #     continue
                 splits = self.decide_split(node)
+                print(splits, node.depth)
                 node.next_split = splits
                 if splits > 0:
                     mapping.append((node, splits))
