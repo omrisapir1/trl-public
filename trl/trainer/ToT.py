@@ -390,7 +390,7 @@ class TreeOfThoughts:
 
         current_depth = 1
         self.max_depth = self.max_split_depth + 2
-        while current_depth < self.max_depth:
+        while current_depth <= self.max_depth:
             active_nodes = [node for node in self.get_all_nodes(root) if node.depth == current_depth and not node.is_terminal()]
             if not active_nodes:
                 break
