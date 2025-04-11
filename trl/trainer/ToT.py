@@ -227,6 +227,8 @@ class TreeOfThoughts:
             result["reward"] = 0
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
             return result
+        elif initial:
+            return result
 
 
         if completion.finish_reason == 'length' or completion.stop_reason == self.END_OF_TEXT_ID_TOKEN or completion.stop_reason is None:
