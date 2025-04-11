@@ -390,6 +390,7 @@ class TreeOfThoughts:
 
         current_depth = 1
         self.max_depth = self.max_split_depth + 2
+        print('max_depth', self.max_depth)
         while current_depth <= self.max_depth:
             active_nodes = [node for node in self.get_all_nodes(root) if node.depth == current_depth and not node.is_terminal()]
             if not active_nodes:
@@ -402,7 +403,7 @@ class TreeOfThoughts:
                 #     terminal_nodes.append(node)
                 #     continue
                 splits = self.decide_split(node)
-                print(splits, node.is_terminal())
+                print(splits, node.is_terminal(), node.depth)
                 node.next_split = splits
                 if splits > 0:
                     mapping.append((node, splits))
