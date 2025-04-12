@@ -319,11 +319,14 @@ class TreeOfThoughts:
                     index = full_text.index(self.ANSWER_START_TOKEN)
                     index += len(self.ANSWER_START_TOKEN)
                     node.state = NodeState.ANSWERING
-                elif thought_count <= self.SPLIT_LEVELS[0]:
+                elif thought_count < self.SPLIT_LEVELS[0]:
                     index = full_text.index(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
                     index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                elif thought_count <= self.SPLIT_LEVELS[2]:
+                elif thought_count == self.SPLIT_LEVELS[0]:
                     index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 2)
+                    index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                elif thought_count <= self.SPLIT_LEVELS[2]:
+                    index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 3)
                     index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
                 else:
                     index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 4)
