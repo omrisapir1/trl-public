@@ -314,7 +314,7 @@ class TreeOfThoughts:
             else:
                 valid_branch_found = True
                 thought_count = full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN) + full_text.count(self.ANSWER_START_TOKEN) + 1
-                print(f'This is thoght count {thought_count}')
+
                 if thought_count == 2 and full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN) == 0:
                     index = full_text.index(self.ANSWER_START_TOKEN)
                     index += len(self.ANSWER_START_TOKEN)
@@ -322,10 +322,10 @@ class TreeOfThoughts:
                 elif thought_count < self.SPLIT_LEVELS[0]:
                     index = full_text.index(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
                     index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                elif thought_count == self.SPLIT_LEVELS[0]:
+                elif thought_count < self.SPLIT_LEVELS[2]:
                     index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 2)
                     index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                elif thought_count <= self.SPLIT_LEVELS[2]:
+                elif thought_count <= (self.SPLIT_LEVELS[2]+1):
                     index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 3)
                     index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
                 else:
@@ -395,7 +395,7 @@ class TreeOfThoughts:
 
         current_depth = 1
 
-        while True:
+        while current_depth<= (self.max_split_depth+2):
             active_nodes = [node for node in self.get_all_nodes(root) if node.depth == current_depth and not node.is_terminal()]
             if not active_nodes:
                 break
@@ -407,7 +407,7 @@ class TreeOfThoughts:
                 #     terminal_nodes.append(node)
                 #     continue
                 splits = self.decide_split(node)
-                print(splits, node.is_terminal(), node.depth)
+
                 node.next_split = splits
                 if splits > 0:
                     mapping.append((node, splits))
