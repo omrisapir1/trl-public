@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 import numpy as np
 from vllm import SamplingParams, LLM
-from extract_answer import extract_final_answer, math_equal
+from .extract_answer import extract_final_answer, math_equal
 
 # ---------------------- Node and State Definitions ---------------------------
 class NodeState(Enum):
