@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 import numpy as np
 from vllm import SamplingParams, LLM
+from extract_answer import extract_final_answer, math_equal
 
 # ---------------------- Node and State Definitions ---------------------------
 class NodeState(Enum):
@@ -255,7 +256,7 @@ class TreeOfThoughts:
             result["to_stop"] = True
             result["stop_reason"] = StopReason.ANSWER_END_TOKEN
             if (text.count(self.ANSWER_START_TOKEN) + prompt_text.count(self.ANSWER_START_TOKEN)) == 1:
-                reward = self.evaluate_solution(text, numerical_label) + self.CORRECT_STRUCTURE_REWARD if numerical_label is not None else self.CORRECT_STRUCTURE_REWARD
+                reward = self.evaluate_solution(text, final_answer) + self.CORRECT_STRUCTURE_REWARD if final_answer is not None else self.CORRECT_STRUCTURE_REWARD
                 result["reward"] = reward
             else:
                 result["reward"] = 0
@@ -268,23 +269,13 @@ class TreeOfThoughts:
 
         return result
 
-    def evaluate_solution(self, text: str, numerical_label: float) -> float:
+    def evaluate_solution(self, text: str, final_answer: str) -> float:
         """
         Evaluate the solution by extracting a numerical answer from a \boxed{...} pattern.
         """
+        final_prediction = extract_final_answer(text)
+        return int(math_equal(final_prediction, final_answer))
 
-        total_reward = 0.0
-        matches = re.findall(r'\\boxed\{([^}]*)\}', text)
-        if matches:
-            extracted = re.sub(r'[^0-9.-]', '', matches[-1]).strip()
-            if extracted.replace('.', '', 1).replace('-', '', 1).isdigit():
-                try:
-                    value = float(extracted)
-                    total_reward += 1 if value == float(numerical_label) else 0
-                    return total_reward
-                except ValueError:
-                    return total_reward
-        return total_reward
 
     def initial_generation(self, root: TreeNode) -> List[TreeNode]:
         """

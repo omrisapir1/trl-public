@@ -500,7 +500,7 @@ class GRPOTrainer(Trainer):
                                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
                                 # This is particularly useful here because we generate completions from the same prompts.
                                 enable_prefix_caching=self.args.vllm_enable_prefix_caching,
-                                max_model_len=24000,
+                                # max_model_len=24000,
                             )
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
@@ -786,12 +786,12 @@ class GRPOTrainer(Trainer):
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
         problem = [x["problem"] for x in inputs][0]
-        numerical_solution = [x["numerical_solution"] for x in inputs][0]
+        final_answer = [x["final_answer"] for x in inputs][0]
         if mode == "train":
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
-                tree_root = self.tree_of_thought.expand_tree(problem, numerical_solution)
+                tree_root = self.tree_of_thought.expand_tree(problem, final_answer)
                 inputs = self._convert_tree_to_training_inputs(tree_root)
                 self._buffered_inputs[buffer_index] = inputs
             else:
@@ -799,7 +799,7 @@ class GRPOTrainer(Trainer):
             self._step += 1
         else:
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
-            tree_root = self.tree_of_thought.expand_tree(problem, numerical_solution)
+            tree_root = self.tree_of_thought.expand_tree(problem, final_answer)
             inputs = self._convert_tree_to_training_inputs(tree_root)
         return inputs
 
