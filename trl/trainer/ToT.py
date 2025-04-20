@@ -184,7 +184,7 @@ class TreeOfThoughts:
             continue_final_message=False
         )
         # For the root, we combine the prompt with an initial thinking context.
-        return prompt + self.THINK_START_TOKEN + self.THINK_END_TOKEN
+        return prompt + self.THINK_START_TOKEN
 
     def decide_split(self, node: TreeNode) -> int:
         """
@@ -222,7 +222,7 @@ class TreeOfThoughts:
         result = {"to_stop": False, "reward": None, "next_split": None, "text": text, "stop_reason": None}
 
 
-        if initial and completion.stop_reason != self.ANSWER_START_TOKEN and (self.THINK_START_TOKEN + self.THINK_END_TOKEN) not in text:
+        if initial and completion.stop_reason != self.ANSWER_START_TOKEN and (self.THINK_END_TOKEN + self.THINK_START_TOKEN) not in text:
             result["to_stop"] = True
             result["reward"] = 0
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
@@ -313,24 +313,24 @@ class TreeOfThoughts:
                 node.completion_ids = self.tokenizer.encode(extracted_text)
             else:
                 valid_branch_found = True
-                thought_count = full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN) + full_text.count(self.ANSWER_START_TOKEN) + 1
+                thought_count = full_text.count(self.THINK_END_TOKEN + self.THINK_START_TOKEN ) + full_text.count(self.ANSWER_START_TOKEN) + 1
 
-                if thought_count == 2 and full_text.count(self.THINK_START_TOKEN + self.THINK_END_TOKEN) == 0:
+                if thought_count == 2 and full_text.count(self.THINK_END_TOKEN + self.THINK_START_TOKEN) == 0:
                     index = full_text.index(self.ANSWER_START_TOKEN)
                     index += len(self.ANSWER_START_TOKEN)
                     node.state = NodeState.ANSWERING
                 elif thought_count < self.SPLIT_LEVELS[0]:
-                    index = full_text.index(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
-                    index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                    index = full_text.index(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
+                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
                 elif thought_count < self.SPLIT_LEVELS[2]:
-                    index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 2)
-                    index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 2)
+                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
                 elif thought_count <= (self.SPLIT_LEVELS[2]+1):
-                    index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 3)
-                    index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 3)
+                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
                 else:
-                    index = kth_occurrence_from_start(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN, 4)
-                    index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 4)
+                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
 
                 extracted_text = full_text[:index]
                 node.completion_text = extracted_text
@@ -343,11 +343,11 @@ class TreeOfThoughts:
                 #
                 # if thought_count:
                 #
-                #     index = kth_occurrence_from_end(full_text, self.THINK_START_TOKEN + self.THINK_END_TOKEN,
+                #     index = kth_occurrence_from_end(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN,
                 #                                     max(int(np.ceil(thought_count / 2)), self.MIN_THINK_TAG_SPLIT))
                 #
                 #     if index != -1:
-                #         index += len(self.THINK_START_TOKEN + self.THINK_END_TOKEN)
+                #         index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
                 #         extracted_text = full_text[:index]
                 #         node.completion_text = extracted_text
                 #         node.completion_ids = self.tokenizer.encode(extracted_text)
