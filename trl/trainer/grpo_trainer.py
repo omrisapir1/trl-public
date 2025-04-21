@@ -319,7 +319,7 @@ class GRPOTrainer(Trainer):
             )
             print(model_init_kwargs)
             print('----------')
-            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
+            model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto', **model_init_kwargs)
             from collections import Counter
 
             # Count dtypes across all parameters
