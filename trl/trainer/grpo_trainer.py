@@ -319,7 +319,7 @@ class GRPOTrainer(Trainer):
             )
             print(model_init_kwargs)
             print('----------')
-            model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto', **model_init_kwargs)
+            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
             from collections import Counter
 
             # Count dtypes across all parameters
@@ -893,6 +893,8 @@ class GRPOTrainer(Trainer):
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+        dtype_counts = Counter(param.dtype for param in model.parameters())
+        print(dtype_counts)
         try:
             chunk_threshold = 2000  # total elements threshold
 
