@@ -317,9 +317,7 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            print(model_init_kwargs)
-            print('----------')
-            model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
+            model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto', **model_init_kwargs)
             from collections import Counter
 
             # Count dtypes across all parameters
@@ -895,10 +893,6 @@ class GRPOTrainer(Trainer):
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         dtype_counts = Counter(param.dtype for param in model.parameters())
-        try:
-            print(dtype_counts)
-        except:
-            raise 
         try:
             chunk_threshold = 2000  # total elements threshold
 
