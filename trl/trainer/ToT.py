@@ -209,7 +209,7 @@ class TreeOfThoughts:
         return nodes
 
     def handle_stop_conditions(self, completion: Any, text: str, prompt_text: str,
-                               numerical_label: Optional[float] = None, initial: bool = False, is_answering: bool = False) -> Dict[str, Optional[Any]]:
+                               final_answer: Optional[str] = None, initial: bool = False, is_answering: bool = False) -> Dict[str, Optional[Any]]:
         """
         Centralized handling of stop conditions based on LLM output.
 
@@ -444,7 +444,7 @@ class TreeOfThoughts:
                     child = TreeNode(prompt_text=parent.prompt_text + parent.completion_text, completion_text=text, parent=parent)
                     child.prompt_ids = output.prompt_token_ids
                     child.completion_ids = completion.token_ids
-                    stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, numerical_label, initial=False, is_answering=is_answering)
+                    stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, final_answer, initial=False, is_answering=is_answering)
 
                     child.completion_text = stop_info["text"]
                     if stop_info["to_stop"]:
