@@ -318,7 +318,13 @@ class GRPOTrainer(Trainer):
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
             print(model_init_kwargs)
+            print('----------')
             model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
+            from collections import Counter
+
+            # Count dtypes across all parameters
+            dtype_counts = Counter(param.dtype for param in model.parameters())
+            print(dtype_counts)
         else:
             model_id = model.config._name_or_path
             if args.model_init_kwargs is not None:
