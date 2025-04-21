@@ -888,13 +888,17 @@ class GRPOTrainer(Trainer):
 
 
     def _compute_loss_for_group(self, model, inputs):
+        from collections import Counter
         prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
         completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
         input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         dtype_counts = Counter(param.dtype for param in model.parameters())
-        print(dtype_counts)
+        try:
+            print(dtype_counts)
+        except:
+            raise 
         try:
             chunk_threshold = 2000  # total elements threshold
 
