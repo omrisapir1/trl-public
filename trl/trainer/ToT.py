@@ -362,7 +362,7 @@ class TreeOfThoughts:
 
         return first_level_nodes
 
-    def expand_tree(self, problem: str, numerical_label: float) -> TreeNode:
+    def expand_tree(self, problem: str, final_answer: float) -> TreeNode:
         """
         Build and expand the tree until max_depth is reached.
 
