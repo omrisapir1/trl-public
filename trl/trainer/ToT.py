@@ -99,7 +99,7 @@ class TreeOfThoughts:
     MID_SPLIT_PROB = 1
 
     NON_SPLIT_COUNT = 1
-    SPLIT_LEVELS = [6, 8, 9]
+    SPLIT_LEVELS = [6, 9,12]
     SPLIT_COUNTES = [4, 5, 6]
 
 
@@ -274,12 +274,10 @@ class TreeOfThoughts:
                 thought_count = full_text.count(self.THINK_END_TOKEN) + 1
                 if thought_count < self.SPLIT_LEVELS[0]:
                     index = full_text.index(self.THINK_END_TOKEN)
-                elif thought_count < self.SPLIT_LEVELS[2]:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 2)
-                elif thought_count <= (self.SPLIT_LEVELS[2]+1):
+                elif thought_count <= self.SPLIT_LEVELS[1]:
                     index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 3)
                 else:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 4)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 5)
 
                 extracted_text = full_text[:index + len(self.THINK_END_TOKEN)]
                 node.completion_text = extracted_text
@@ -345,7 +343,6 @@ class TreeOfThoughts:
 
             current_depth += 1
             if not mapping:
-
                 continue
 
             sampling = self.mid_to_end_sampling_params if current_depth == self.max_split_depth else self.think_sampling_params
