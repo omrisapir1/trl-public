@@ -99,7 +99,7 @@ class TreeOfThoughts:
     MID_SPLIT_PROB = 1
 
     NON_SPLIT_COUNT = 1
-    SPLIT_LEVELS = [6, 9,12]
+    SPLIT_LEVELS = [9, 12, 14]
     SPLIT_COUNTES = [4, 5, 6]
 
 
@@ -273,11 +273,11 @@ class TreeOfThoughts:
                 valid_branch_found = True
                 thought_count = full_text.count(self.THINK_END_TOKEN) + 1
                 if thought_count < self.SPLIT_LEVELS[0]:
-                    index = full_text.index(self.THINK_END_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 2)
                 elif thought_count <= self.SPLIT_LEVELS[1]:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 3)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 4)
                 else:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 5)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 6)
 
                 extracted_text = full_text[:index + len(self.THINK_END_TOKEN)]
                 node.completion_text = extracted_text
