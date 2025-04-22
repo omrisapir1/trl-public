@@ -360,6 +360,7 @@ class TreeOfThoughts:
                     child.completion_ids = completion.token_ids
                     stop_info = self.handle_stop_conditions(completion, text, final_answer, initial=False)
                     child.completion_text = stop_info["text"]
+                    child.structured_reward = self.evaluate_sturcture_reward(stop_info["text"])
 
                     if stop_info["to_stop"]:
                         child.structured_reward = self.evaluate_sturcture_reward(stop_info["text"])
