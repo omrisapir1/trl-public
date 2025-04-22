@@ -497,7 +497,7 @@ class GRPOTrainer(Trainer):
                                 dtype=torch.bfloat16,
                                 max_num_seqs=64,
 
-                                max_num_batched_tokens=16 * 1500,
+                                max_num_batched_tokens=64 * 1500,
                                 # trust_remote_code=True,
 
                                 # tensor_parallel_size=2,
