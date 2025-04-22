@@ -231,7 +231,7 @@ class TreeOfThoughts:
 
 
     def evaluate_sturcture_reward(self, text: str) -> float:
-        tags = [(m.group(), m.start()) for m in re.finditer(r'</?think>', text)]
+        tags = [m.group() for m in re.finditer(r'</?think>', text)]
         stack = []
 
         for tag in tags:
