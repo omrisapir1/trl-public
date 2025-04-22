@@ -19,6 +19,7 @@ class NodeState(Enum):
 class StopReason(Enum):
     LENGTH = 1
     END_TOKEN = 2
+    FIND_BOX_ANSWER = 3
 
 PATH_TO_SAVE_DATA = 'training_data/'
 
@@ -171,7 +172,7 @@ class TreeOfThoughts:
             continue_final_message=False
         )
         # For the root, we combine the prompt with an initial thinking context.
-        return prompt + self.THINK_START_TOKEN
+        return prompt
 
     def decide_split(self, node: TreeNode) -> int:
         """
@@ -218,6 +219,11 @@ class TreeOfThoughts:
             result["to_stop"] = True
             result["reward"] = result["reward"] = self.evaluate_solution(text, final_answer)
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.END_TOKEN
+            return result
+        elif re.search(r"\\boxed\s*\{(.*?)\}", text, re.DOTALL | re.IGNORECASE):
+            result["to_stop"] = True
+            result["reward"] = result["reward"] = self.evaluate_solution(text, final_answer)
+            result["stop_reason"] = StopReason.FIND_BOX_ANSWER
             return result
 
         return result
@@ -363,7 +369,7 @@ class TreeOfThoughts:
                     child.structured_reward = self.evaluate_sturcture_reward(stop_info["text"])
 
                     if stop_info["to_stop"]:
-                        child.structured_reward = self.evaluate_sturcture_reward(stop_info["text"])
+                        child.structured_reward =0 if stop_info['stop_reason']==StopReason.LENGTH  else self.evaluate_sturcture_reward(stop_info["text"])
                         child.mark_terminal(stop_info["reward"], stop_info["stop_reason"])
                     parent.add_child(child)
 
