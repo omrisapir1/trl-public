@@ -67,10 +67,6 @@ class TreeNode:
         self.reward = reward
         self.stop_reason = stop_reason
 
-    def mark_invalid(self):
-        self.state = NodeState.INVALID
-        self.reward = 0.0
-
     def is_terminal(self) -> bool:
         return self.state in {NodeState.TERMINAL, NodeState.INVALID}
 
@@ -102,7 +98,7 @@ class TreeOfThoughts:
     MAX_FIRST_ANS_TOKENS = 2200
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
 
-    CORRECT_STRUCTURE_REWARD = 0.1
+    CORRECT_STRUCTURE_REWARD = 1
     FIRST_SPLIT_COUNT = 2
     FIRST_SPLIT_PROB = 1
     MIN_THINK_TAG_SPLIT = 1
@@ -414,8 +410,13 @@ class TreeOfThoughts:
 
                 continue
 
-            # sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
-            sampling = self.mid_to_end_sampling_params if current_depth == (self.max_split_depth - 1) else self.think_sampling_params
+            if current_depth == (self.max_split_depth - 1):
+                sampling = self.mid_to_end_sampling_params
+            if current_depth == self.max_split_depth:
+                sampling == self.final_sampling_params
+            else:
+                sampling = self.think_sampling_params
+
             outputs = self.llm.generate(batch_prompts, sampling)
             comp_idx = 0
 

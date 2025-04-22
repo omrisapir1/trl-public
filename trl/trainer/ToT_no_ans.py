@@ -64,10 +64,6 @@ class TreeNode:
         self.reward = reward
         self.stop_reason = stop_reason
 
-    def mark_invalid(self):
-        self.state = NodeState.INVALID
-        self.reward = 0.0
-
     def is_terminal(self) -> bool:
         return self.state in {NodeState.TERMINAL, NodeState.INVALID}
 
@@ -79,11 +75,6 @@ class TreeNode:
     def compute_final_reward(self) -> float:
         return sum(self.rewards) / len(self.rewards) if self.rewards else 0.0
 
-    def get_full_text(self) -> str:
-        """
-        Returns the combined text (prompt and completion).
-        """
-        return self.prompt_text + self.completion_text
 
 # ---------------------- TreeOfThoughts Class ---------------------------
 class TreeOfThoughts:
@@ -108,7 +99,7 @@ class TreeOfThoughts:
 
     NON_SPLIT_COUNT = 1
     SPLIT_LEVELS = [6, 8, 9]
-    SPLIT_COUNTES = [4, 5, 6]
+    SPLIT_COUNTES = [5, 6, 7]
 
 
     def __init__(self, llm):
@@ -217,9 +208,9 @@ class TreeOfThoughts:
         result = {"to_stop": False, "reward": None, "next_split": None, "text": text, "stop_reason": None}
 
 
-        if initial and completion.stop_reason != self.ANSWER_START_TOKEN and (self.THINK_END_TOKEN + self.THINK_START_TOKEN) not in text:
+        if initial and (self.THINK_END_TOKEN + self.THINK_START_TOKEN) not in text:
             result["to_stop"] = True
-            result["reward"] = 0
+            result["reward"] = self.evaluate_solution(text, final_answer)
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
             return result
         elif initial:
