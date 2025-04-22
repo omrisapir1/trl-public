@@ -85,9 +85,9 @@ class TreeOfThoughts:
     END_OF_TEXT_ID_TOKEN = 151643
 
     MAX_THINK_TOKENS = 512
-    MAX_MID_TO_FINAL_TOKENS = 1524 + 256
+    MAX_MID_TO_FINAL_TOKENS = 1700
     MAX_FIRST_ANS_TOKENS = 2200 + 256
-    MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
+    MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1700
 
     CORRECT_STRUCTURE_REWARD = 0.1
     FIRST_SPLIT_COUNT = 2
@@ -377,7 +377,7 @@ class TreeOfThoughts:
                 node.propagate_reward(node.reward)
         for node in self.get_all_nodes(root):
             if not node.is_terminal():
-                node.reward = np.mean(node.rewards)
+                node.reward = np.mean(node.rewards) + node.structured_reward
             if len(node.completion_ids) > self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR:
                 node.completion_ids = node.completion_ids[:self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
                 node.truncated = True
