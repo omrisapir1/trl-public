@@ -13,19 +13,17 @@ from .extract_answer import extract_final_answer, math_equal
 # ---------------------- Node and State Definitions ---------------------------
 class NodeState(Enum):
     EXPLORING = 1
-    ANSWERING = 2
-    TERMINAL = 3
-    INVALID = 4
+    TERMINAL = 2
+    INVALID = 3
 
 class StopReason(Enum):
     LENGTH = 1
-    INVALID_STRUCTURE = 2
-    ANSWER_END_TOKEN = 3
+    END_TOKEN = 2
 
 PATH_TO_SAVE_DATA = 'training_data/'
 
 class TreeNode:
-    def __init__(self, prompt_text: str, completion_text: str = "", parent: Optional['TreeNode'] = None, final_answer: str = None):
+    def __init__(self, prompt_text: str, completion_text: str = "", parent: Optional['TreeNode'] = None):
         self.prompt_text = prompt_text         # The original prompt/context
         self.completion_text = completion_text # The generated output
         self.parent = parent
@@ -39,7 +37,7 @@ class TreeNode:
         self.next_split: Optional[int] = None
         self.stop_reason: Optional[StopReason] = None
         self.truncated: bool = False
-        self.final_answer: str = final_answer
+        self.structured_reward: float = 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -55,7 +53,7 @@ class TreeNode:
             "stop_reason": self.stop_reason.name if self.stop_reason else None,
             "children": [child.to_dict() for child in self.children],
             "truncated": self.truncated,
-            "final_answer": self.final_answer
+            "structured_reward": self.structured_reward,
         }
 
     def add_child(self, child_node: 'TreeNode'):
@@ -78,27 +76,20 @@ class TreeNode:
     def compute_final_reward(self) -> float:
         return sum(self.rewards) / len(self.rewards) if self.rewards else 0.0
 
-    def get_full_text(self) -> str:
-        """
-        Returns the combined text (prompt and completion).
-        """
-        return self.prompt_text + self.completion_text
 
 # ---------------------- TreeOfThoughts Class ---------------------------
 class TreeOfThoughts:
     # Configuration constants
     THINK_END_TOKEN = '</think>'
     THINK_START_TOKEN = '<think>'
-    ANSWER_START_TOKEN = '<answer>'
-    ANSWER_END_TOKEN = '</answer>'
     END_OF_TEXT_ID_TOKEN = 151643
 
     MAX_THINK_TOKENS = 512
-    MAX_MID_TO_FINAL_TOKENS = 1524
-    MAX_FIRST_ANS_TOKENS = 2200
+    MAX_MID_TO_FINAL_TOKENS = 1524 + 256
+    MAX_FIRST_ANS_TOKENS = 2200 + 256
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 1000
 
-    CORRECT_STRUCTURE_REWARD = 1
+    CORRECT_STRUCTURE_REWARD = 0.1
     FIRST_SPLIT_COUNT = 2
     FIRST_SPLIT_PROB = 1
     MIN_THINK_TAG_SPLIT = 1
@@ -124,7 +115,7 @@ class TreeOfThoughts:
             top_k=50,
             repetition_penalty=1.0,
             skip_special_tokens=False,
-            stop=[self.THINK_END_TOKEN, self.ANSWER_END_TOKEN, self.ANSWER_START_TOKEN],
+            stop=[self.THINK_END_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -135,7 +126,6 @@ class TreeOfThoughts:
             top_k=50,
             repetition_penalty=1.0,
             skip_special_tokens=False,
-            stop=[self.ANSWER_END_TOKEN, self.ANSWER_START_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -146,7 +136,6 @@ class TreeOfThoughts:
             top_k=50,
             repetition_penalty=1.0,
             skip_special_tokens=False,
-            stop=[self.ANSWER_END_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -157,7 +146,6 @@ class TreeOfThoughts:
             top_k=50,
             repetition_penalty=1.0,
             skip_special_tokens=False,
-            stop=[self.ANSWER_END_TOKEN, self.ANSWER_START_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
@@ -189,15 +177,13 @@ class TreeOfThoughts:
         """
         Decide the number of child branches to generate.
         """
-
         if node.is_terminal():
             return 0
-        elif node.depth < (self.max_split_depth-1):
-            if node.state == NodeState.ANSWERING:
-                return 0
-            return self.MID_SPLIT_COUNT
-        else:
-            return self.LAST_SPLIT_COUNT
+        return self.MID_SPLIT_COUNT
+        # elif node.depth < (self.max_split_depth-1):
+        #     return self.MID_SPLIT_COUNT
+        # else:
+        #     return self.LAST_SPLIT_COUNT
 
 
     def get_all_nodes(self, node: 'TreeNode') -> List[TreeNode]:
@@ -206,8 +192,7 @@ class TreeOfThoughts:
             nodes += self.get_all_nodes(n)
         return nodes
 
-    def handle_stop_conditions(self, completion: Any, text: str, prompt_text: str,
-                               final_answer: Optional[str] = None, initial: bool = False, is_answering: bool = False) -> Dict[str, Optional[Any]]:
+    def handle_stop_conditions(self, completion: Any, text: str, final_answer: Optional[str] = None, initial: bool = False) -> Dict[str, Optional[Any]]:
         """
         Centralized handling of stop conditions based on LLM output.
 
@@ -221,48 +206,18 @@ class TreeOfThoughts:
         result = {"to_stop": False, "reward": None, "next_split": None, "text": text, "stop_reason": None}
 
 
-        if initial and completion.stop_reason != self.ANSWER_START_TOKEN and (self.THINK_END_TOKEN + self.THINK_START_TOKEN) not in text:
+        if initial and self.THINK_START_TOKEN not in text:
             result["to_stop"] = True
             result["reward"] = self.evaluate_solution(text, final_answer)
-            result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
+            result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.END_TOKEN
             return result
         elif initial:
             return result
 
-
         if completion.finish_reason == 'length' or completion.stop_reason == self.END_OF_TEXT_ID_TOKEN or completion.stop_reason is None:
             result["to_stop"] = True
-            result["reward"] = self.evaluate_solution(text, final_answer)
-            result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
-            return result
-
-        # if initial and (self.ANSWER_END_TOKEN in text or (completion.stop_reason is not None and completion.stop_reason != self.ANSWER_START_TOKEN)):
-        #     result["to_stop"] = True
-        #     result["reward"] = 0
-        #     result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
-        #     return result
-
-
-
-        if is_answering and (completion.stop_reason != self.ANSWER_END_TOKEN or any([t in text for t in [self.THINK_END_TOKEN, self.THINK_START_TOKEN]])):
-            result["to_stop"] = True
-            result["reward"] = self.evaluate_solution(text, final_answer)
-            result["stop_reason"] = StopReason.INVALID_STRUCTURE
-            return result
-
-        if completion.stop_reason == self.ANSWER_END_TOKEN:
-            result["to_stop"] = True
-            result["stop_reason"] = StopReason.ANSWER_END_TOKEN
-            if (text.count(self.ANSWER_START_TOKEN) + prompt_text.count(self.ANSWER_START_TOKEN)) == 1:
-                reward = self.evaluate_solution(text, final_answer) + self.CORRECT_STRUCTURE_REWARD if final_answer is not None else self.CORRECT_STRUCTURE_REWARD
-                result["reward"] = reward
-            else:
-                result["reward"] = self.evaluate_solution(text, final_answer)
-            return result
-        if completion.stop_reason == self.ANSWER_START_TOKEN:
-            result["next_split"] = self.LAST_SPLIT_COUNT if random.random() < self.LAST_SPLIT_PROB else self.NON_SPLIT_COUNT
-            return result
-        if completion.stop_reason == self.THINK_END_TOKEN:
+            result["reward"] = result["reward"] = self.evaluate_solution(text, final_answer)
+            result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.END_TOKEN
             return result
 
         return result
@@ -273,6 +228,20 @@ class TreeOfThoughts:
         """
         final_prediction = extract_final_answer(text)
         return int(math_equal(final_prediction, final_answer))
+
+
+    def evaluate_sturcture_reward(self, text: str) -> float:
+        tags = [(m.group(), m.start()) for m in re.finditer(r'</?think>', text)]
+        stack = []
+
+        for tag in tags:
+            if tag == self.THINK_START_TOKEN:
+                stack.append(tag)
+            elif tag == self.THINK_END_TOKEN:
+                if not stack:
+                    return 0
+                stack.pop()
+        return (not stack) * self.CORRECT_STRUCTURE_REWARD
 
 
     def initial_generation(self, root: TreeNode) -> List[TreeNode]:
@@ -288,7 +257,7 @@ class TreeOfThoughts:
         for output in outputs:
             completion = output.outputs[0]
             full_text = completion.text
-            stop_info = self.handle_stop_conditions(completion, full_text, root.prompt_text, initial=True)
+            stop_info = self.handle_stop_conditions(completion, full_text, initial=True)
 
             # Create a node with separated prompt and completion.
             node = TreeNode(prompt_text=root.prompt_text, completion_text=full_text, parent=root)
@@ -302,47 +271,20 @@ class TreeOfThoughts:
                 node.completion_ids = self.tokenizer.encode(extracted_text)
             else:
                 valid_branch_found = True
-                thought_count = full_text.count(self.THINK_END_TOKEN + self.THINK_START_TOKEN ) + full_text.count(self.ANSWER_START_TOKEN) + 1
-
-                if thought_count == 2 and full_text.count(self.THINK_END_TOKEN + self.THINK_START_TOKEN) == 0:
-                    index = full_text.index(self.ANSWER_START_TOKEN)
-                    index += len(self.ANSWER_START_TOKEN)
-                    node.state = NodeState.ANSWERING
-                elif thought_count < self.SPLIT_LEVELS[0]:
-                    index = full_text.index(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
-                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
+                thought_count = full_text.count(self.THINK_END_TOKEN) + 1
+                if thought_count < self.SPLIT_LEVELS[0]:
+                    index = full_text.index(self.THINK_END_TOKEN)
                 elif thought_count < self.SPLIT_LEVELS[2]:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 2)
-                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 2)
                 elif thought_count <= (self.SPLIT_LEVELS[2]+1):
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 3)
-                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 3)
                 else:
-                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN, 4)
-                    index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
+                    index = kth_occurrence_from_start(full_text, self.THINK_END_TOKEN, 4)
 
-                extracted_text = full_text[:index]
+                extracted_text = full_text[:index + len(self.THINK_END_TOKEN)]
                 node.completion_text = extracted_text
                 node.completion_ids = self.tokenizer.encode(extracted_text)
-
-
-
-                # node.state = NodeState.ANSWERING
-                # node.next_split = stop_info["next_split"]
-                #
-                # if thought_count:
-                #
-                #     index = kth_occurrence_from_end(full_text, self.THINK_END_TOKEN + self.THINK_START_TOKEN,
-                #                                     max(int(np.ceil(thought_count / 2)), self.MIN_THINK_TAG_SPLIT))
-                #
-                #     if index != -1:
-                #         index += len(self.THINK_END_TOKEN + self.THINK_START_TOKEN)
-                #         extracted_text = full_text[:index]
-                #         node.completion_text = extracted_text
-                #         node.completion_ids = self.tokenizer.encode(extracted_text)
-                #     else:
-                #         node.state = NodeState.ANSWERING
-                #         node.next_split = stop_info["next_split"]
+                node.structured_reward = self.evaluate_sturcture_reward(extracted_text)
 
             root.add_child(node)
             first_level_nodes.append(node)
@@ -373,7 +315,7 @@ class TreeOfThoughts:
 
         terminal_nodes: List[TreeNode] = []
         prompt = self.preprocess_problem(problem)
-        root = TreeNode(prompt_text=prompt,final_answer=final_answer)
+        root = TreeNode(prompt_text=prompt)
 
 
         first_level = self.initial_generation(root)
@@ -381,10 +323,9 @@ class TreeOfThoughts:
             logs.append("No valid branch found in initial generation.")
             return root
 
-
         current_depth = 1
-
-        while current_depth<= (self.max_split_depth+2):
+        print(f'self.max_split_depth {self.max_split_depth}')
+        while current_depth <= self.max_split_depth:
             active_nodes = [node for node in self.get_all_nodes(root) if node.depth == current_depth and not node.is_terminal()]
             if not active_nodes:
                 break
@@ -392,9 +333,6 @@ class TreeOfThoughts:
             batch_prompts: List[str] = []
             mapping: List[Tuple[TreeNode, int]] = []
             for node in active_nodes:
-                # if node.depth == self.max_depth:
-                #     terminal_nodes.append(node)
-                #     continue
                 splits = self.decide_split(node)
 
                 node.next_split = splits
@@ -410,35 +348,12 @@ class TreeOfThoughts:
 
                 continue
 
-            if current_depth == (self.max_split_depth - 1):
-                sampling = self.mid_to_end_sampling_params
-            if current_depth == self.max_split_depth:
-                sampling == self.final_sampling_params
-            else:
-                sampling = self.think_sampling_params
-
+            print(f'current_depth {current_depth}')
+            sampling = self.mid_to_end_sampling_params if current_depth == self.max_split_depth else self.think_sampling_params
             outputs = self.llm.generate(batch_prompts, sampling)
             comp_idx = 0
 
             for parent, splits in mapping:
-                is_answering = parent.state == NodeState.ANSWERING
-                # If the decided split is 1, extend the parent node rather than adding a new node.
-                # if splits == 1:
-                #     output = outputs[comp_idx]
-                #     comp_idx += 1
-                #     completion = output.outputs[0]
-                #     text = completion.text
-                #     stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, numerical_label, initial=False, is_answering=is_answering)
-                #     # Extend parent's completion text and token ids.
-                #     parent.completion_text += stop_info["text"]
-                #     parent.completion_ids += completion.token_ids
-                #     parent.depth += 1  # Increase parent's depth to reflect extension.
-                #     if stop_info["to_stop"]:
-                #         parent.mark_terminal(stop_info["reward"], stop_info["stop_reason"])
-                #     if stop_info["next_split"] is not None:
-                #         parent.next_split = stop_info["next_split"]
-                #         parent.state = NodeState.ANSWERING
-                # else:
                 for _ in range(splits):
                     output = outputs[comp_idx]
                     comp_idx += 1
@@ -447,16 +362,12 @@ class TreeOfThoughts:
                     child = TreeNode(prompt_text=parent.prompt_text + parent.completion_text, completion_text=text, parent=parent)
                     child.prompt_ids = output.prompt_token_ids
                     child.completion_ids = completion.token_ids
-                    stop_info = self.handle_stop_conditions(completion, text, parent.prompt_text + parent.completion_text, final_answer, initial=False, is_answering=is_answering)
-
+                    stop_info = self.handle_stop_conditions(completion, text, final_answer, initial=False)
                     child.completion_text = stop_info["text"]
+
                     if stop_info["to_stop"]:
+                        child.structured_reward = self.evaluate_sturcture_reward(stop_info["text"])
                         child.mark_terminal(stop_info["reward"], stop_info["stop_reason"])
-
-                    if stop_info["next_split"] is not None:
-                        child.state = NodeState.ANSWERING
-                        child.next_split = stop_info["next_split"]
-
                     parent.add_child(child)
 
 
