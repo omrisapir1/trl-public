@@ -25,7 +25,7 @@ class StopReason(Enum):
 PATH_TO_SAVE_DATA = 'training_data/'
 
 class TreeNode:
-    def __init__(self, prompt_text: str, completion_text: str = "", parent: Optional['TreeNode'] = None):
+    def __init__(self, prompt_text: str, completion_text: str = "", parent: Optional['TreeNode'] = None, final_answer: str = None):
         self.prompt_text = prompt_text         # The original prompt/context
         self.completion_text = completion_text # The generated output
         self.parent = parent
@@ -39,6 +39,7 @@ class TreeNode:
         self.next_split: Optional[int] = None
         self.stop_reason: Optional[StopReason] = None
         self.truncated: bool = False
+        self.final_answer: str = final_answer
 
     def to_dict(self) -> dict:
         return {
@@ -54,6 +55,7 @@ class TreeNode:
             "stop_reason": self.stop_reason.name if self.stop_reason else None,
             "children": [child.to_dict() for child in self.children],
             "truncated": self.truncated,
+            "final_answer": self.final_answer
         }
 
     def add_child(self, child_node: 'TreeNode'):
@@ -64,10 +66,6 @@ class TreeNode:
         self.state = NodeState.TERMINAL
         self.reward = reward
         self.stop_reason = stop_reason
-
-    def mark_invalid(self):
-        self.state = NodeState.INVALID
-        self.reward = 0.0
 
     def is_terminal(self) -> bool:
         return self.state in {NodeState.TERMINAL, NodeState.INVALID}
@@ -225,7 +223,7 @@ class TreeOfThoughts:
 
         if initial and completion.stop_reason != self.ANSWER_START_TOKEN and (self.THINK_END_TOKEN + self.THINK_START_TOKEN) not in text:
             result["to_stop"] = True
-            result["reward"] = 0
+            result["reward"] = self.evaluate_solution(text, final_answer)
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
             return result
         elif initial:
@@ -234,7 +232,7 @@ class TreeOfThoughts:
 
         if completion.finish_reason == 'length' or completion.stop_reason == self.END_OF_TEXT_ID_TOKEN or completion.stop_reason is None:
             result["to_stop"] = True
-            result["reward"] = 0
+            result["reward"] = self.evaluate_solution(text, final_answer)
             result["stop_reason"] = StopReason.LENGTH if completion.finish_reason == 'length' else StopReason.INVALID_STRUCTURE
             return result
 
@@ -248,7 +246,7 @@ class TreeOfThoughts:
 
         if is_answering and (completion.stop_reason != self.ANSWER_END_TOKEN or any([t in text for t in [self.THINK_END_TOKEN, self.THINK_START_TOKEN]])):
             result["to_stop"] = True
-            result["reward"] = 0
+            result["reward"] = self.evaluate_solution(text, final_answer)
             result["stop_reason"] = StopReason.INVALID_STRUCTURE
             return result
 
@@ -259,7 +257,7 @@ class TreeOfThoughts:
                 reward = self.evaluate_solution(text, final_answer) + self.CORRECT_STRUCTURE_REWARD if final_answer is not None else self.CORRECT_STRUCTURE_REWARD
                 result["reward"] = reward
             else:
-                result["reward"] = 0
+                result["reward"] = self.evaluate_solution(text, final_answer)
             return result
         if completion.stop_reason == self.ANSWER_START_TOKEN:
             result["next_split"] = self.LAST_SPLIT_COUNT if random.random() < self.LAST_SPLIT_PROB else self.NON_SPLIT_COUNT
@@ -375,7 +373,7 @@ class TreeOfThoughts:
 
         terminal_nodes: List[TreeNode] = []
         prompt = self.preprocess_problem(problem)
-        root = TreeNode(prompt_text=prompt)
+        root = TreeNode(prompt_text=prompt,final_answer=final_answer)
 
 
         first_level = self.initial_generation(root)
