@@ -377,7 +377,8 @@ class TreeOfThoughts:
                 node.propagate_reward(node.reward)
         for node in self.get_all_nodes(root):
             if not node.is_terminal():
-                node.reward = np.mean(node.rewards) + node.structured_reward
+                node.reward = np.mean(node.rewards)
+            node.reward += node.structured_reward
             if len(node.completion_ids) > self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR:
                 node.completion_ids = node.completion_ids[:self.MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR]
                 node.truncated = True
