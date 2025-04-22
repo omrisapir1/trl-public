@@ -161,6 +161,17 @@ class TreeOfThoughts:
             n=1,
             include_stop_str_in_output=True,
         )
+        self.last_sampling  = SamplingParams(
+            temperature=0.9,
+            max_tokens=self.MAX_MID_TO_FINAL_TOKENS,
+            top_p=1.0,
+            top_k=50,
+            repetition_penalty=1.0,
+            skip_special_tokens=False,
+            stop=[self.ANSWER_END_TOKEN],
+            n=1,
+            include_stop_str_in_output=True,
+        )
         self._remove_logs()
 
     def _remove_logs(self):
@@ -411,7 +422,14 @@ class TreeOfThoughts:
                 continue
 
             # sampling = self.final_sampling_params if current_depth == (self.max_depth - 1) else self.think_sampling_params
-            sampling = self.mid_to_end_sampling_params if current_depth == (self.max_split_depth - 1) else self.think_sampling_params
+            if current_depth == self.max_split_depth:
+                sampling =self.last_sampling
+            elif current_depth == (self.max_split_depth - 1):
+                sampling = self.mid_to_end_sampling_params
+            else:
+                sampling = self.think_sampling_params
+
+
             outputs = self.llm.generate(batch_prompts, sampling)
             comp_idx = 0
 
