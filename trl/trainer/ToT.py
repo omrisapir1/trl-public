@@ -11,10 +11,10 @@ from vllm import SamplingParams, LLM
 from .extract_answer import extract_final_answer, math_equal
 
 
-TEMPARTURE = 1.2
-TOP_K = 50
-REPETITION_PENALTY = 1.0
-TOP_P = 0.9
+TEMPARTURE = 1.3
+TOP_K = 100
+REPETITION_PENALTY = 1.1
+TOP_P = 0.95
 
 class NodeState(Enum):
     EXPLORING = 1
@@ -95,7 +95,7 @@ class TreeOfThoughts:
     MAX_FIRST_ANS_TOKENS = 2200 + 256
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 3500
 
-    CORRECT_STRUCTURE_REWARD = 0.05
+    CORRECT_STRUCTURE_REWARD = 0.01
     FIRST_SPLIT_COUNT = 2
     FIRST_SPLIT_PROB = 1
     MIN_THINK_TAG_SPLIT = 1
@@ -244,7 +244,7 @@ class TreeOfThoughts:
     def evaluate_sturcture_reward(self, text: str) -> float:
         tags = [m.group() for m in re.finditer(r'</?think>', text)]
         if len(tags) > 0 and not text.startswith(self.THINK_START_TOKEN):
-            return False
+            return 0
         stack = []
 
         for tag in tags:
