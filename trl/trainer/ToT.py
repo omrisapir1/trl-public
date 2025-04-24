@@ -11,10 +11,10 @@ from vllm import SamplingParams, LLM
 from .extract_answer import extract_final_answer, math_equal
 
 
-TEMPARTURE = 1.2
-TOP_K = 50
+TEMPARTURE = 1.3
+TOP_K = 30
 REPETITION_PENALTY = 1.0
-TOP_P = 0.9
+TOP_P = 0.95
 
 class NodeState(Enum):
     EXPLORING = 1
