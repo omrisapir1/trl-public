@@ -12,9 +12,9 @@ from .extract_answer import extract_final_answer, math_equal
 
 
 TEMPARTURE = 1.2
-TOP_K = 70
+TOP_K = 50
 REPETITION_PENALTY = 1.0
-TOP_P = 0.85
+TOP_P = 0.9
 
 class NodeState(Enum):
     EXPLORING = 1
@@ -95,7 +95,7 @@ class TreeOfThoughts:
     MAX_FIRST_ANS_TOKENS = 2200 + 256
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 3500
 
-    CORRECT_STRUCTURE_REWARD = 0.1
+    CORRECT_STRUCTURE_REWARD = 0.05
     FIRST_SPLIT_COUNT = 2
     FIRST_SPLIT_PROB = 1
     MIN_THINK_TAG_SPLIT = 1
