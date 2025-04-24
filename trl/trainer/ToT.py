@@ -10,7 +10,12 @@ import numpy as np
 from vllm import SamplingParams, LLM
 from .extract_answer import extract_final_answer, math_equal
 
-# ---------------------- Node and State Definitions ---------------------------
+
+TEMPARTURE = 1.1
+TOP_K = 50
+REPETITION_PENALTY = 1.0
+TOP_P = 1.0
+
 class NodeState(Enum):
     EXPLORING = 1
     TERMINAL = 2
@@ -110,42 +115,42 @@ class TreeOfThoughts:
 
         # Define sampling parameters for different generation stages.
         self.think_sampling_params = SamplingParams(
-            temperature=0.9,
+            temperature=TEMPARTURE,
             max_tokens=self.MAX_THINK_TOKENS,
-            top_p=1.0,
-            top_k=50,
-            repetition_penalty=1.0,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             stop=[self.THINK_END_TOKEN],
             n=1,
             include_stop_str_in_output=True,
         )
         self.mid_to_end_sampling_params = SamplingParams(
-            temperature=0.9,
+            temperature=TEMPARTURE,
             max_tokens=self.MAX_MID_TO_FINAL_TOKENS,
-            top_p=1.0,
-            top_k=50,
-            repetition_penalty=1.0,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             n=1,
             include_stop_str_in_output=True,
         )
         self.final_sampling_params = SamplingParams(
-            temperature=0.9,
+            temperature=TEMPARTURE,
             max_tokens=self.MAX_THINK_TOKENS,
-            top_p=1.0,
-            top_k=50,
-            repetition_penalty=1.0,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             n=1,
             include_stop_str_in_output=True,
         )
         self.first_answer_params = SamplingParams(
-            temperature=0.9,
+            temperature=TEMPARTURE,
             max_tokens=self.MAX_FIRST_ANS_TOKENS,
-            top_p=1.0,
-            top_k=50,
-            repetition_penalty=1.0,
+            top_p=TOP_P,
+            top_k=TOP_K,
+            repetition_penalty=REPETITION_PENALTY,
             skip_special_tokens=False,
             n=1,
             include_stop_str_in_output=True,
@@ -238,10 +243,14 @@ class TreeOfThoughts:
 
     def evaluate_sturcture_reward(self, text: str) -> float:
         tags = [m.group() for m in re.finditer(r'</?think>', text)]
+        if len(tags) > 0 and not text.startswith(self.THINK_START_TOKEN):
+            return False
         stack = []
 
         for tag in tags:
             if tag == self.THINK_START_TOKEN:
+                if stack:
+                    return 0
                 stack.append(tag)
             elif tag == self.THINK_END_TOKEN:
                 if not stack:
