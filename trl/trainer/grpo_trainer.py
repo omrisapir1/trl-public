@@ -845,24 +845,24 @@ class GRPOTrainer(Trainer):
             logits_to_keep = completion_ids.size(1)
 
             # Chunked ref log prob computation (memory-safe)
-            max_chunk_size = 2
-            batch_size = prompt_completion_ids.size(0)
-            outputs = []
-            for i in range(0, batch_size, max_chunk_size):
-                p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-                with torch.no_grad():
-                    sub_output = self._get_per_token_logps(
-                        self.ref_model,
-                        p_chunk,
-                        m_chunk,
-                        logits_to_keep
-                    )
-                if sub_output is None:
-                    return  # Skip this group
-                outputs.append(sub_output)
-
-            ref_per_token_logps = torch.cat(outputs, dim=0)
+            # max_chunk_size = 2
+            # batch_size = prompt_completion_ids.size(0)
+            # outputs = []
+            # for i in range(0, batch_size, max_chunk_size):
+            #     p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+            #     m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+            #     with torch.no_grad():
+            #         sub_output = self._get_per_token_logps(
+            #             self.ref_model,
+            #             p_chunk,
+            #             m_chunk,
+            #             logits_to_keep
+            #         )
+            #     if sub_output is None:
+            #         return  # Skip this group
+            #     outputs.append(sub_output)
+            #
+            # ref_per_token_logps = torch.cat(outputs, dim=0)
 
             # Build group dict
             group_dicts.append({
@@ -872,7 +872,7 @@ class GRPOTrainer(Trainer):
                 "completion_mask": completion_mask,
                 "advantages": advantages,
                 "old_per_token_logps": None,  # or fill in if needed
-                "ref_per_token_logps": ref_per_token_logps,
+                "ref_per_token_logps": None, #ref_per_token_logps,
             })
 
             # Recurse down the tree
