@@ -14,7 +14,7 @@ from .extract_answer import extract_final_answer, math_equal
 TEMPARTURE = 1.1
 TOP_K = 50
 REPETITION_PENALTY = 1.0
-TOP_P = 1.0
+TOP_P = 0.8
 
 class NodeState(Enum):
     EXPLORING = 1
