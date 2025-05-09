@@ -916,7 +916,8 @@ class GRPOTrainer(Trainer):
             print('--------- advantages ---------')
             print(g["advantages"])
             print('-----------------')
-        raise 
+        if group_dicts:
+            raise
         return group_dicts
 
 
