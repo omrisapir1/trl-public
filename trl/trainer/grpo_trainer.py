@@ -914,8 +914,8 @@ class GRPOTrainer(Trainer):
                 print(self.tokenizer.decode(p))
                 print()
             print('--------- completion ---------')
-            for g in g["completion_ids"].tolist():
-                print(self.tokenizer.decode(g))
+            for ge in g["completion_ids"].tolist():
+                print(self.tokenizer.decode(ge))
                 print()
             print('--------- advantages ---------')
             print(g["advantages"])
