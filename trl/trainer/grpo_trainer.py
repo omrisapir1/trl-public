@@ -908,7 +908,15 @@ class GRPOTrainer(Trainer):
 
         # Start recursion
         process_node(tree_root)
-
+        for g in group_dicts:
+            print('--------- PROMPT ---------')
+            self.tokenizer.decode(g["prompt_ids"])
+            print('--------- completion ---------')
+            self.tokenizer.decode(g["completion_ids"])
+            print('--------- advantages ---------')
+            print(g["advantages"])
+            print('-----------------')
+        raise 
         return group_dicts
 
 
