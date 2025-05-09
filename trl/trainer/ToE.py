@@ -214,6 +214,9 @@ class TreeOfThoughtsEntropyVLLM:
                 total_tokens = len(out.token_ids)
                 # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
                 # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
+                if at_splitable_token:
+                    print(top.values())
+                    print(raw_H)
 
                 if (
                         len(top) > 1 and raw_H > TAU and
