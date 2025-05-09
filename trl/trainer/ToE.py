@@ -195,7 +195,7 @@ class TreeOfThoughtsEntropyVLLM:
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 out = chunk.outputs[0]
                 # --- entropy --------------------------------------------------
-                top = {tid: e.logprob for tid, e in out.logprobs[-1].items()} if out.logprobs else {}
+                top = {tid: e.logprob for tid, e in out.logprobs[-1].items() if e.logprob<abs(999999999999)} if out.logprobs else {}
                 raw_H = 0.0
 
 
@@ -214,9 +214,7 @@ class TreeOfThoughtsEntropyVLLM:
                 total_tokens = len(out.token_ids)
                 # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
                 # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
-                if at_splitable_token:
-                    print(out.logprobs)
-                    raise 
+
                 if (
                         len(top) > 1 and raw_H > TAU and
                         node.depth < MAX_DEPTH_SPLIT and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
