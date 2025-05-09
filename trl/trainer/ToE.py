@@ -130,13 +130,8 @@ class TreeOfThoughtsEntropyVLLM:
         if take_one_from_prompt:
             init_addition_tokens.append(node.prompt_ids[-1])
             node.prompt_ids = node.prompt_ids[:-1]
-        try:
 
-            node.completion_ids = init_addition_tokens + output.token_ids
-        except:
-            print(output.token_ids)
-            print(init_addition_tokens)
-            raise 
+        node.completion_ids = init_addition_tokens + list(output.token_ids)
         if remove_last_token:
             last_token_id = node.completion_ids[-1]
             node.completion_ids = node.completion_ids[:-1]
