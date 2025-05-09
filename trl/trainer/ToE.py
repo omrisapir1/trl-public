@@ -195,7 +195,7 @@ class TreeOfThoughtsEntropyVLLM:
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 out = chunk.outputs[0]
                 # --- entropy --------------------------------------------------
-                top = {tid: e.logprob for tid, e in out.logprobs[-1].items() if e.logprob<abs(999999999999)} if out.logprobs else {}
+                top = {tid: e.logprob for tid, e in out.logprobs[-1].items() if abs(e.logprob)<(999999999999)} if out.logprobs else {}
                 raw_H = 0.0
 
 
