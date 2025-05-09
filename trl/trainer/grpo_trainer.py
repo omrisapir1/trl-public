@@ -62,7 +62,28 @@ from .utils import (
     print_prompt_completions_sample,
     selective_log_softmax,
 )
+import asyncio
 
+# If you plan to run in notebooks, install nest_asyncio once:
+# pip install nest_asyncio
+import nest_asyncio
+nest_asyncio.apply()
+
+
+def run_async(coro):
+    """
+    Execute *coro* (a coroutine) and return its result.
+
+    • In a normal Python script     → starts a fresh event loop.
+    • In a running event-loop (e.g. Jupyter) → re-uses that loop safely.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # Already inside an event-loop (Jupyter, web-server …)
+        return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No loop running – create one
+        return asyncio.run(coro)
 
 if is_deepspeed_available():
     import deepspeed
@@ -792,7 +813,7 @@ class GRPOTrainer(Trainer):
         return loss.detach()
 
     @profiling_decorator
-    async def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+    def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
         problem = [x["problem"] for x in inputs][0]
         final_answer = [x["final_answer"] for x in inputs][0]
@@ -800,7 +821,7 @@ class GRPOTrainer(Trainer):
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
-                tree_root = await self.tree_of_thought.expand_tree(problem, final_answer)
+                tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
                 inputs = self._convert_tree_to_training_inputs(tree_root)
                 self._buffered_inputs[buffer_index] = inputs
             else:
@@ -808,7 +829,7 @@ class GRPOTrainer(Trainer):
             self._step += 1
         else:
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
-            tree_root = await self.tree_of_thought.expand_tree(problem, final_answer)
+            tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
             inputs = self._convert_tree_to_training_inputs(tree_root)
         return inputs
 
