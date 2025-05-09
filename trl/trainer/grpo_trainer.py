@@ -797,7 +797,7 @@ class GRPOTrainer(Trainer):
 
                     torch.cuda.empty_cache()
         if not losses:
-            loss = torch.zeros(1, device=self.accelerator.device, requires_grad=True)
+            loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
         else:
             loss = torch.stack(losses).mean()
 
