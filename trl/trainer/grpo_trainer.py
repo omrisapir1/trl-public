@@ -529,7 +529,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
-            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(self.vllm_client, self.tokenizer)
+            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
