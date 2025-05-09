@@ -35,7 +35,7 @@ for child in SAVE_DIR.iterdir():
     if child.is_file() or child.is_symlink():
         child.unlink()           # remove file or symlink
     else:
-        shutil.rmtree(child) 
+        shutil.rmtree(child)
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
@@ -200,6 +200,8 @@ class TreeOfThoughtsEntropyVLLM:
 
 
                 if len(top) > 1:
+
+
                     p = np.exp(list(top.values()));
                     p /= p.sum()
                     raw_H = float(-(p * np.log(p)).sum())
@@ -213,7 +215,8 @@ class TreeOfThoughtsEntropyVLLM:
                 # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
                 # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
                 if at_splitable_token:
-                    print(raw_H)
+                    print(out.logprobs)
+                    raise 
                 if (
                         len(top) > 1 and raw_H > TAU and
                         node.depth < MAX_DEPTH_SPLIT and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
