@@ -792,7 +792,7 @@ class GRPOTrainer(Trainer):
         return loss.detach()
 
     @profiling_decorator
-    def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+    async def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
         problem = [x["problem"] for x in inputs][0]
         final_answer = [x["final_answer"] for x in inputs][0]
