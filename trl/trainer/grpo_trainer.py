@@ -910,13 +910,13 @@ class GRPOTrainer(Trainer):
         process_node(tree_root)
         for g in group_dicts:
             print('--------- PROMPT ---------')
-            try:
-                self.tokenizer.decode(g["prompt_ids"])
-            except:
-                print(g["prompt_ids"])
-                raise 
+            for p in g["prompt_ids"].tolist():
+                print(self.tokenizer.decode(p))
+                print()
             print('--------- completion ---------')
-            self.tokenizer.decode(g["completion_ids"])
+            for g in g["completion_ids"].tolist():
+                print(self.tokenizer.decode(g))
+                print()
             print('--------- advantages ---------')
             print(g["advantages"])
             print('-----------------')
