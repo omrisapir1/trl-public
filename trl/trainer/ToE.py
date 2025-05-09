@@ -25,6 +25,17 @@ MIN_SPLIT_TOKENS = 10
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
+from pathlib import Path
+import shutil
+
+SAVE_DIR = Path("training_data_entropy_vllm")
+
+# Iterate over everything directly inside the directory
+for child in SAVE_DIR.iterdir():
+    if child.is_file() or child.is_symlink():
+        child.unlink()           # remove file or symlink
+    else:
+        shutil.rmtree(child) 
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
@@ -104,7 +115,7 @@ class TreeOfThoughtsEntropyVLLM:
     def __init__(self, *, engine: AsyncLLMEngine, tokenizer: AutoTokenizer) -> None:
         self.engine, self.tokenizer = engine, tokenizer
         self.sem = asyncio.Semaphore(MAX_STREAMS)
-        os.rmdir(SAVE_DIR)
+
         SAVE_DIR.mkdir(exist_ok=True)
 
     # ------------------------------------------------------------- helpers ----
