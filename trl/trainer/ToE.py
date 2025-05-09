@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional
-
+from .extract_answer import extract_final_answer, math_equal
 from transformers import AutoTokenizer
 from vllm import SamplingParams
 from vllm.engine.async_llm_engine import AsyncLLMEngine
