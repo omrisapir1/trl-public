@@ -24,7 +24,6 @@ MIN_SPLIT_TOKENS = 10
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
-SAVE_DIR.mkdir(exist_ok=True)
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
@@ -104,6 +103,8 @@ class TreeOfThoughtsEntropyVLLM:
     def __init__(self, *, engine: AsyncLLMEngine, tokenizer: AutoTokenizer) -> None:
         self.engine, self.tokenizer = engine, tokenizer
         self.sem = asyncio.Semaphore(MAX_STREAMS)
+        os.rmdir(SAVE_DIR)
+        SAVE_DIR.mkdir(exist_ok=True)
 
     # ------------------------------------------------------------- helpers ----
     def _prompt(self, problem: str) -> List[int]:
@@ -199,6 +200,8 @@ class TreeOfThoughtsEntropyVLLM:
                 total_tokens = len(out.token_ids)
                 # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
                 # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
+                if at_splitable_token:
+                    print(raw_H)
                 if (
                         len(top) > 1 and raw_H > TAU and
                         node.depth < MAX_DEPTH_SPLIT and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
