@@ -14,7 +14,7 @@ from .extract_answer import extract_final_answer, math_equal
 TEMPARTURE = 1.3
 TOP_K = 100
 REPETITION_PENALTY = 1.1
-TOP_P = 0.95
+TOP_P = 0.5
 
 class NodeState(Enum):
     EXPLORING = 1
@@ -95,7 +95,7 @@ class TreeOfThoughts:
     MAX_FIRST_ANS_TOKENS = 2200 + 256
     MAX_INVALID_TOKENS_TO_CALC_LOSS_FOR = 3500
 
-    CORRECT_STRUCTURE_REWARD = 0.01
+    CORRECT_STRUCTURE_REWARD = 0.05
     FIRST_SPLIT_COUNT = 2
     FIRST_SPLIT_PROB = 1
     MIN_THINK_TAG_SPLIT = 1
@@ -429,3 +429,4 @@ def kth_occurrence_from_start(s: str, sub: str, k: int) -> int:
             return -1
     return pos
 
+from vllm.engine.async_llm_engine import AsyncLLMEngine

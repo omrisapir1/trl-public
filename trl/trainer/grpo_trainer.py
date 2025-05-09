@@ -45,12 +45,16 @@ from transformers.utils import is_peft_available
 from ..data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
 from ..extras.profiling import profiling_context, profiling_decorator
 # from ..extras.vllm_client import VLLMClient
-from vllm import LLM
+# from vllm import LLM
+from vllm.engine.arg_utils import AsyncEngineArgs
+from vllm.engine.async_llm_engine import AsyncLLMEngine
+
 from ..import_utils import is_deepspeed_available, is_rich_available, is_vllm_available
 from ..models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
 from .callbacks import SyncRefModelCallback
 from .grpo_config import GRPOConfig
 from .ToT import TreeOfThoughts
+from .ToE import TreeOfThoughtsEntropyVLLM
 from .utils import (
     generate_model_card,
     get_comet_experiment_url,
@@ -489,7 +493,7 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.vllm_client = LLM(
+                self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
@@ -506,7 +510,7 @@ class GRPOTrainer(Trainer):
                                 # This is particularly useful here because we generate completions from the same prompts.
                                 enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                                 # max_model_len=24000,
-                            )
+                            ))
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -525,7 +529,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
-            self.tree_of_thought = TreeOfThoughts(self.vllm_client)
+            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(self.vllm_client, self.tokenizer)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
@@ -684,7 +688,8 @@ class GRPOTrainer(Trainer):
             else:
                 state_dict = unwrapped_model.state_dict()
             if self.accelerator.is_main_process:
-                llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
+                # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
+                llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
                 llm_model.load_weights(state_dict.items())
 
             # Unmerge the adapter to restore the model to its original state.
@@ -787,7 +792,7 @@ class GRPOTrainer(Trainer):
         return loss.detach()
 
     @profiling_decorator
-    def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+    async def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
         problem = [x["problem"] for x in inputs][0]
         final_answer = [x["final_answer"] for x in inputs][0]
@@ -795,7 +800,7 @@ class GRPOTrainer(Trainer):
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
-                tree_root = self.tree_of_thought.expand_tree(problem, final_answer)
+                tree_root = await self.tree_of_thought.expand_tree(problem, final_answer)
                 inputs = self._convert_tree_to_training_inputs(tree_root)
                 self._buffered_inputs[buffer_index] = inputs
             else:
@@ -803,7 +808,7 @@ class GRPOTrainer(Trainer):
             self._step += 1
         else:
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
-            tree_root = self.tree_of_thought.expand_tree(problem, final_answer)
+            tree_root = await self.tree_of_thought.expand_tree(problem, final_answer)
             inputs = self._convert_tree_to_training_inputs(tree_root)
         return inputs
 
