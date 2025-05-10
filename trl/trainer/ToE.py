@@ -15,9 +15,9 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 MAX_STREAMS = 128
 TAU = 0.5  # threshold on EMA entropy
 
-TEMP = 1.1
-TOP_P = 0.95
-TOP_K = 70
+TEMP = 0.99
+TOP_P = 0.9
+TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
