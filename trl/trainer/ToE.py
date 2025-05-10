@@ -13,7 +13,7 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 0.4  # threshold on EMA entropy
+TAU = 0.6  # threshold on EMA entropy
 
 TEMP = 0.99
 TOP_P = 0.9
@@ -21,7 +21,7 @@ TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
-MIN_SPLIT_TOKENS = 10
+MIN_SPLIT_TOKENS = 20
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
@@ -39,7 +39,7 @@ for child in SAVE_DIR.iterdir():
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
-MAX_DEPTH_SPLIT = 7
+MAX_DEPTH_SPLIT = 9
 
 
 class NodeState(Enum):
