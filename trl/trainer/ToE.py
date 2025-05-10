@@ -39,7 +39,7 @@ for child in SAVE_DIR.iterdir():
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
-MAX_DEPTH_SPLIT = 8
+MAX_DEPTH_SPLIT = 7
 
 
 class NodeState(Enum):
