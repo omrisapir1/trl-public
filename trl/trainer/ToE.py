@@ -1,65 +1,55 @@
+
 import os
-import asyncio, json, uuid, re, math, time, shutil, numpy as np
+import asyncio, json, uuid, re, numpy as np
+import time
 from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Tuple, Iterable
-
+from typing import Any, Dict, List, Optional
+from .extract_answer import extract_final_answer, math_equal
 from transformers import AutoTokenizer
 from vllm import SamplingParams
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 
-from .extract_answer import extract_final_answer, math_equal
 
-# ──────────────────────────────────────────────────────────────────────────────
-# constants / hyper‑params
-# ──────────────────────────────────────────────────────────────────────────────
-MAX_STREAMS        = 128
-TAU                = 0.4     # entropy trigger for splits *after* first‑pass
-TEMP               = 0.99
-TOP_P, TOP_K       = 0.9, 50
-REP_PENALTY        = 1.1
-LOGPROBS_K         = 20
-MAX_TOKENS_GEN     = 4_000
-MIN_SPLIT_TOKENS   = 10
+MAX_STREAMS = 128
+TAU = 0.4  # threshold on EMA entropy
 
-SPLITABLE_TOKENS   = {"\n", "!", ".", "?"}   # thought separators
-MAX_DEPTH_SPLIT    = 7       # same as MAX_SPLIT in discussion
+TEMP = 0.99
+TOP_P = 0.9
+TOP_K = 50
+REP_PENALTY = 1.1
+LOGPROBS_K = 20
+MAX_TOKENS_GEN = 4000
+MIN_SPLIT_TOKENS = 10
 
-SAVE_DIR           = Path("training_data_entropy_vllm")
-SAVE_DIR.mkdir(exist_ok=True)
-# clean directory each run (dev convenience)
+
+SAVE_DIR = Path("training_data_entropy_vllm");
+from pathlib import Path
+import shutil
+
+SAVE_DIR = Path("training_data_entropy_vllm")
+
+# Iterate over everything directly inside the directory
 for child in SAVE_DIR.iterdir():
-    if child.is_dir(): shutil.rmtree(child)
-    else: child.unlink(missing_ok=True)
+    if child.is_file() or child.is_symlink():
+        child.unlink()           # remove file or symlink
+    else:
+        shutil.rmtree(child)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# node data model
-# ──────────────────────────────────────────────────────────────────────────────
+
+SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
+MAX_DEPTH_SPLIT = 7
+
+
 class NodeState(Enum):
     EXPLORING = auto()
-    TERMINAL  = auto()
+    TERMINAL = auto()
+
 
 class StopReason(Enum):
     DONE = auto()
 
-def _collapse_separators(txt: str) -> Tuple[bool,int,str]:
-    """Returns (is_break,new_breaks,last_char) after collapsing runs of separators+ws."""
-    if not txt:
-        return False,0,"
-    i = len(txt)-1
-    cnt = 0
-    while i>=0 and txt[i].isspace():
-        i -= 1
-    while i>=0 and txt[i] in SPLITABLE_TOKENS:
-        cnt += 1; i -= 1
-        while i>=0 and txt[i].isspace():
-            i -= 1
-    return cnt>0, cnt, txt[-1]
-
-def _token_entropy(lps: List[float]) -> float:
-    p = np.exp(lps); p /= p.sum()
-    return float(-(p*np.log(p)).sum())
 
 @dataclass
 class TreeNode:
@@ -72,160 +62,209 @@ class TreeNode:
     completion_ids: List[int] = field(default_factory=list)
     children: List["TreeNode"] = field(default_factory=list)
 
-    # runtime flags
-    first_pass: bool = False              # streaming immunity flag
-    thought_quota: Optional[int] = None   # for logging/debug
-
+    # runtime signals
+    ema_entropy: list[float] = field(default_factory=list)
     state: NodeState = NodeState.EXPLORING
     reward: Optional[float] = None
     rewards: List[float] = field(default_factory=list)
     stop_reason: Optional[StopReason] = None
 
-    # helpers ----------------------------------------------------------
-    def add_child(self, c:"TreeNode") -> None: self.children.append(c)
+    def add_child(self, c: "TreeNode") -> None:
+        self.children.append(c)
 
-    def propagate_reward(self,r:float):
+    def propagate_reward(self, r: float):
         self.rewards.append(r)
-        if self.parent: self.parent.propagate_reward(r)
+        if self.parent:
+            self.parent.propagate_reward(r)
 
-    def compute_final_reward(self)->float:
-        return sum(self.rewards)/len(self.rewards) if self.rewards else 0.0
+    def compute_final_reward(self) -> float:
+        return sum(self.rewards) / len(self.rewards) if self.rewards else 0.0
 
     def traverse(self):
-        stack=[self]
+        stack = [self]
         while stack:
-            n=stack.pop(); yield n; stack.extend(n.children)
+            n = stack.pop();
+            yield n;
+            stack.extend(n.children)
+
+    # avg advantage for immediate children
+    def local_advantage(self):
+        if not self.children: return 0.0, 0
+        rewards = [c.reward for c in self.children]
+        tok_cnt = sum(len(c.completion_ids) for c in self.children)
+        return (max(rewards) - float(np.mean(rewards))), tok_cnt
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "prompt_ids": self.prompt_ids,
+            "completion_ids": self.completion_ids,
+            "prompt_text": self.prompt_text,
+            "completion_text": self.completion_text,
+            "state": self.state.name,
+            "reward": self.reward,
+            "rewards": self.rewards,
+            "depth": self.depth,
+            "children": [c.to_dict() for c in self.children],
+        }
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 class TreeOfThoughtsEntropyVLLM:
-    """Two‑phase ToT with initial token split + thought‑quota truncation."""
+    """EMA‑smoothed entropy tree search driven by AsyncLLMEngine."""
 
-    def __init__(self, *, engine: AsyncLLMEngine, tokenizer: AutoTokenizer):
+    def __init__(self, *, engine: AsyncLLMEngine, tokenizer: AutoTokenizer) -> None:
         self.engine, self.tokenizer = engine, tokenizer
-        self.sem  = asyncio.Semaphore(MAX_STREAMS)
+        self.sem = asyncio.Semaphore(MAX_STREAMS)
 
-    # chat prompt ------------------------------------------------------
-    def _prompt(self, problem:str)->List[int]:
-        return self.tokenizer.apply_chat_template([
-            {"role":"user","content":problem}], tokenize=True,
-            add_generation_prompt=True, continue_final_message=False)
+        SAVE_DIR.mkdir(exist_ok=True)
 
-    # evaluation -------------------------------------------------------
-    def _reward(self, txt:str, ans:str)->float:
-        try: return int(math_equal(extract_final_answer(txt), ans))
-        except: return 0
+    # ------------------------------------------------------------- helpers ----
+    def _prompt(self, problem: str) -> List[int]:
+        return self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": problem}],
+            tokenize=True,
+            add_generation_prompt=True,
+            continue_final_message=False,
+        )
 
-    # ------------------------------------------------------------------
-    async def expand_tree(self, problem:str, answer:str)->TreeNode:
+    def evaluate_solution(self, text: str, final_answer: str) -> float:
+        """
+        Evaluate the solution by extracting a numerical answer from a \boxed{...} pattern.
+        """
+        final_prediction = extract_final_answer(text)
+        try:
+            return int(math_equal(final_prediction, final_answer))
+        except:
+            return 0
+
+    def _update_node_with_output(self, node: TreeNode, output: Any, take_one_from_prompt: bool,
+                                 remove_last_token: bool) -> int:
+        last_token_id = None
+        init_addition_tokens = []
+        if take_one_from_prompt:
+            init_addition_tokens.append(node.prompt_ids[-1])
+            node.prompt_ids = node.prompt_ids[:-1]
+
+        node.completion_ids = init_addition_tokens + list(output.token_ids)
+        if remove_last_token:
+            last_token_id = node.completion_ids[-1]
+            node.completion_ids = node.completion_ids[:-1]
+        node.prompt_text = self.tokenizer.decode(node.prompt_ids)
+        node.completion_text = self.tokenizer.decode(node.completion_ids)
+        return last_token_id
+
+    # ----------------------------------------------------------- main entry ---
+    async def expand_tree(self, problem: str, answer: str) -> TreeNode:
+        self.cur_split_count = 0
         root = TreeNode(self._prompt(problem))
-        await self._seed_first_two_children(root, answer)
-        # wait all spawned tasks
-        if hasattr(self,"_tasks") and self._tasks:
-            while (pending:=[t for t in self._tasks if not t.done()]):
+        await self._spawn(root, answer)
+        if hasattr(self, "_tasks") and self._tasks:
+            await asyncio.gather(*self._tasks)
+
+            while True:
+                # keep only tasks that are not finished yet
+                pending = [t for t in self._tasks if not t.done()]
+                if not pending:
+                    break
+                # await the current batch; new tasks may be appended meanwhile
                 await asyncio.gather(*pending)
-        # propagate rewards
-        for n in root.traverse():
-            if n.state is NodeState.TERMINAL: n.propagate_reward(n.reward or 0)
-        for n in root.traverse():
-            if n.state is not NodeState.TERMINAL: n.reward=n.compute_final_reward()
-        SAVE_DIR.joinpath(f"{time.time()}.json").write_text(json.dumps(self._to_dict(root),indent=2))
+
+        for n in self._all_nodes(root):
+            if n.state is NodeState.TERMINAL:
+                n.propagate_reward(n.reward or 0.0)
+        for n in self._all_nodes(root):
+            if n.state is not NodeState.TERMINAL:
+                n.reward = n.compute_final_reward()
+        SAVE_DIR.joinpath(f"{time.time()}.json").write_text(json.dumps(root.to_dict(), indent=2))
         return root
 
-    # ------------------------------------------------------------------
-    async def _seed_first_two_children(self, root:TreeNode, answer:str):
-        """Generate **one token**, branch into original+alt children, fully generate them."""
-        params = SamplingParams(temperature=TEMP,top_p=TOP_P,top_k=TOP_K,
-                                repetition_penalty=REP_PENALTY,max_tokens=1,logprobs=LOGPROBS_K)
-        async for chunk in self.engine.generate(self.tokenizer.decode(root.prompt_ids), params, request_id=str(uuid.uuid4())):
-            out = chunk.outputs[0]
-            tok_id = out.token_id; tok_lp = out.logprobs[-1][tok_id].logprob
-            top = {tid:e.logprob for tid,e in out.logprobs[-1].items()}
-            alt_ids,lps = zip(*[(t,lp) for t,lp in top.items() if t!=tok_id])
-            alt_id = int(np.random.choice(alt_ids, p=np.exp(lps)/np.exp(lps).sum()))
-            break
-        # create children
-        for forced in (tok_id, alt_id):
-            child = TreeNode(root.prompt_ids+[forced], depth=1, parent=root, first_pass=True)
-            root.add_child(child)
-            self._tasks = getattr(self,"_tasks",[])
-            self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
-
-    # ------------------------------------------------------------------
-    async def _spawn(self, node:TreeNode, answer:str):
+    # ---------------------------------------------------------------- spawn ---
+    async def _spawn(self, node: TreeNode, answer: str):
         async with self.sem:
-            params = SamplingParams(temperature=TEMP,top_p=TOP_P,top_k=TOP_K,
-                                    repetition_penalty=REP_PENALTY,max_tokens=MAX_TOKENS_GEN,logprobs=LOGPROBS_K)
-            prefix_text = self.tokenizer.decode(node.prompt_ids)
-            thoughts_seen = 0; quota_reached=False
-            stream_restart = False
-            async for chunk in self.engine.generate(prefix_text, params, request_id=str(uuid.uuid4())):
+            params = SamplingParams(
+                temperature=TEMP,
+                top_p=TOP_P,
+                top_k=TOP_K,
+                repetition_penalty=REP_PENALTY,
+                max_tokens=MAX_TOKENS_GEN,
+                logprobs=LOGPROBS_K,
+            )
+            prompt_text = self.tokenizer.decode(node.prompt_ids)
+            ema_entropy = []
+            at_splitable_token = False
+            async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 out = chunk.outputs[0]
-                # append token text/ids
-                node.completion_ids.append(out.token_id)
-                node.completion_text += out.text
-                # separator collapse
-                is_break,new_breaks,last_char = _collapse_separators(out.text)
-                if is_break and not quota_reached: thoughts_seen += new_breaks
-                # first‑pass logic ------------------------------------------------
-                if node.first_pass:
-                    if chunk.finish_reason is not None:  # reached </s>
-                        total_thoughts = max(1, thoughts_seen)
-                        quota = math.floor(max(total_thoughts-MAX_DEPTH_SPLIT,0)/2)
-                        quota = max(1, quota)
-                        node.thought_quota = quota
-                        # truncate if needed
-                        if total_thoughts>MAX_DEPTH_SPLIT and quota<total_thoughts:
-                            node.completion_ids, node.completion_text = self._truncate_to_thoughts(node.completion_ids, quota)
-                        # flip flag and restart streaming from new prefix
-                        node.first_pass=False
-                        await self._resume_stream(node, answer)
-                        return
-                    continue  # still in first pass → skip entropy logic
+                # --- entropy --------------------------------------------------
+                top = {tid: e.logprob for tid, e in out.logprobs[-1].items() if abs(e.logprob)<(999999999999)} if out.logprobs else {}
+                raw_H = 0.0
 
-                # entropy split logic after first pass ------------------------
-                top = {tid:e.logprob for tid,e in out.logprobs[-1].items()} if out.logprobs else {}
+
+                if len(top) > 1:
+
+
+                    p = np.exp(list(top.values()));
+                    p /= p.sum()
+                    raw_H = float(-(p * np.log(p)).sum())
+                    # mvg_avg = np.mean(ema_entropy[-self.window_k:-1]) * (1 - self.alpha_ema) + self.alpha_ema * raw_H
+                    # ema_entropy.append(raw_H)
+
+
+
+                # --- split decision ------------------------------------------
+                total_tokens = len(out.token_ids)
+                # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
+                # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
+                # if at_splitable_token:
+                #     print(top.values())
+                #     print(raw_H)
+
                 if (
-                    is_break and len(top)>1 and (H:=_token_entropy(list(top.values())))>TAU and
-                    node.depth<MAX_DEPTH_SPLIT and len(node.completion_ids)>MIN_SPLIT_TOKENS
+                        len(top) > 1 and raw_H > TAU and
+                        node.depth < MAX_DEPTH_SPLIT and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
+                        # self.cur_split_count < MAX_TOTAL_SPLITS
                 ):
-                    await self._entropy_branch(node, out, top, answer)
-                    return
-            # stream finished normally --------------------------------------
-            node.state=NodeState.TERMINAL
-            node.stop_reason=StopReason.DONE
-            node.reward=self._reward(node.completion_text, answer)
 
-    # -------- resume streaming after truncation ---------------------------
-    async def _resume_stream(self, node:TreeNode, answer:str):
-        # simply call _spawn again (without first_pass flag)
-        await self._spawn(node, answer)
+                    self.cur_split_count += 1
 
-    # -------- entropy branch ---------------------------------------------
-    async def _entropy_branch(self,node:TreeNode,out,top,answer):
-        tok_id = node.completion_ids.pop()   # remove last token from parent
-        node.completion_text = self.tokenizer.decode(node.completion_ids)
-        next_prompt_ids = node.prompt_ids + node.completion_ids
-        cand_ids,cand_lps = zip(*[(t,lp) for t,lp in top.items() if t!=tok_id])
-        probs = np.exp(cand_lps); probs/=probs.sum(); alt_id=int(np.random.choice(cand_ids,p=probs))
-        for forced in (tok_id,alt_id):
-            child = TreeNode(next_prompt_ids+[forced], depth=node.depth+1, parent=node)
-            node.add_child(child)
-            self._tasks=getattr(self,"_tasks",[])
-            self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
+                    # remove the high‑entropy token from parent, return its id
+                    tok_id = self._update_node_with_output(
+                        node,
+                        out,
+                        take_one_from_prompt=(node.depth != 0),
+                        remove_last_token=True,
+                    )
+                    next_prompt_ids = node.prompt_ids + node.completion_ids
 
-    # -------- truncate helper -------------------------------------------
-    def _truncate_to_thoughts(self, ids:List[int], quota:int)->Tuple[List[int],str]:
-        txt=self.tokenizer.decode(ids)
-        breaks=0; cut_idx=len(txt)
-        for m in re.finditer(r"[!.?\n]+", txt):
-            breaks+=1
-            if breaks==quota:
-                cut_idx = m.end()
-                break
-        new_txt = txt[:cut_idx]
-        new_ids = self.tokenizer.encode(new_txt, add_special_tokens=False)
-        return new_ids, new_txt
+                    cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t != tok_id])
+                    probs = np.exp(np.array(cand_lps) / TEMP);
+                    probs /= probs.sum()
+                    alt_tid = int(np.random.choice(cand_ids, p=probs))
 
-    # -------- tree traversal -------------------------------------------
-    def _to_dict(self,root:TreeNode)->Dict[str,Any]:
-        return root.to_dict()
+                    for forced in (tok_id, alt_tid):
+                        child = TreeNode(next_prompt_ids + [forced], depth=node.depth + 1, parent=node)
+                        node.add_child(child)
+                        self._tasks = getattr(self, "_tasks", [])
+                        self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
+                    return  # stop parent stream
+                at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
+
+            # === terminal node ===============================================
+            self._update_node_with_output(
+                node,
+                out,
+                take_one_from_prompt=(node.depth != 0),
+                remove_last_token=False,  # keep last token
+            )
+            node.state = NodeState.TERMINAL
+            node.stop_reason = StopReason.DONE
+            node.reward = self.evaluate_solution(node.completion_text, answer)
+
+    # ------------------------------------------------------------------
+    def _all_nodes(self, root: TreeNode) -> List[TreeNode]:
+        st, out = [root], []
+        while st:
+            n = st.pop();
+            out.append(n);
+            st.extend(n.children)
+        return out
+
