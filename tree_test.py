@@ -17,7 +17,7 @@ training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True,
 
 
 trainer = GRPOTrainer(
-    model="omrisap/Qwen2.5-1.5B_Math_2K_COT_SFT",
+    model="Qwen/Qwen2.5-Math-1.5B-Instruct",
     reward_funcs=dumy_func,
     train_dataset=hf_dataset,
     args=training_args,
