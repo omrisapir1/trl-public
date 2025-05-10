@@ -46,7 +46,7 @@ class StopReason(Enum):
 def _collapse_separators(txt: str) -> Tuple[bool,int,str]:
     """Returns (is_break,new_breaks,last_char) after collapsing runs of separators+ws."""
     if not txt:
-        return False,0,""
+        return False,0,"
     i = len(txt)-1
     cnt = 0
     while i>=0 and txt[i].isspace():
