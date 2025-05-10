@@ -222,7 +222,7 @@ class TreeOfThoughtsEntropyVLLM:
                         len(top) > 1 and raw_H > TAU and
                         node.depth < MAX_DEPTH_SPLIT and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
                         # self.cur_split_count < MAX_TOTAL_SPLITS
-                ):
+                ) or (node.depth==0):
 
                     self.cur_split_count += 1
 
