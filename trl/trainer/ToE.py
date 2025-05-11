@@ -13,15 +13,16 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 1.2  # threshold on EMA entropy
-TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
+TAU = 1  # threshold on EMA entropy
+# TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
 TEMP = 0.99
 TOP_P = 0.9
 TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
-MIN_SPLIT_TOKENS = 20
+MIN_SPLIT_TOKENS = 30
+LAST_SPLIT_MIN_TOKENS = 30
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
@@ -39,7 +40,7 @@ for child in SAVE_DIR.iterdir():
 
 
 SPLITABLE_TOKENS = {'\n', '!', '.', '?'}
-MAX_DEPTH_SPLIT = 7
+MAX_DEPTH_SPLIT = 6
 
 
 class NodeState(Enum):
@@ -138,7 +139,7 @@ class TreeOfThoughtsEntropyVLLM:
             return 0
 
     def _update_node_with_output(self, node: TreeNode, output: Any, take_one_from_prompt: bool,
-                                 remove_last_token: bool) -> int:
+                                 remove_last_token: bool, last_split=False) -> int:
         last_token_id = None
         init_addition_tokens = []
         if take_one_from_prompt:
@@ -149,6 +150,11 @@ class TreeOfThoughtsEntropyVLLM:
         if remove_last_token:
             last_token_id = node.completion_ids[-1]
             node.completion_ids = node.completion_ids[:-1]
+        elif last_split:
+            last_index_splitable_char = last_occurrence(out.text[:LAST_SPLIT_MIN_TOKENS], SPLITABLE_TOKENS)
+            node.completion_ids = self.tokenizer.encode(out.text[:last_index_splitable_char + 1])
+
+
         node.prompt_text = self.tokenizer.decode(node.prompt_ids)
         node.completion_text = self.tokenizer.decode(node.completion_ids)
         return last_token_id
@@ -179,7 +185,7 @@ class TreeOfThoughtsEntropyVLLM:
         return root
 
     # ---------------------------------------------------------------- spawn ---
-    async def _spawn(self, node: TreeNode, answer: str):
+    async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
@@ -193,6 +199,11 @@ class TreeOfThoughtsEntropyVLLM:
             ema_entropy = []
             at_splitable_token = False
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
+                if after_last_split:
+                    continue
+                total_tokens = len(out.token_ids)
+                if total_tokens < MIN_SPLIT_TOKENS:
+                    continue
                 out = chunk.outputs[0]
                 # --- entropy --------------------------------------------------
                 top = {tid: -99 if np.isinf(e.logprob) else e.logprob for tid, e in out.logprobs[-1].items() } if out.logprobs else {}
@@ -211,7 +222,7 @@ class TreeOfThoughtsEntropyVLLM:
 
 
                 # --- split decision ------------------------------------------
-                total_tokens = len(out.token_ids)
+
                 # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
                 # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
                 # if at_splitable_token:
@@ -220,8 +231,8 @@ class TreeOfThoughtsEntropyVLLM:
 
 
                 if (
-                        len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU[node.depth]
-                        and at_splitable_token and len(out.token_ids) > MIN_SPLIT_TOKENS
+                        len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
+                        and at_splitable_token
                         # self.cur_split_count < MAX_TOTAL_SPLITS
                 ) or (node.depth==0):
 
@@ -249,12 +260,32 @@ class TreeOfThoughtsEntropyVLLM:
                     return  # stop parent stream
                 at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
 
-            # === terminal node ===============================================
+
+            if not after_last_split:
+                self._update_node_with_output(
+                    node,
+                    out,
+                    take_one_from_prompt=(node.depth != 0),
+                    remove_last_token=False,
+                    last_split=True,
+
+                )
+                next_prompt_ids = node.prompt_ids + node.completion_ids
+                after_last_split = True
+                for _ in range(2):
+                    child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
+                    node.add_child(child)
+                    self._tasks = getattr(self, "_tasks", [])
+                    self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
+                return
+
+
             self._update_node_with_output(
                 node,
                 out,
-                take_one_from_prompt=(node.depth != 0),
+                take_one_from_prompt=False,
                 remove_last_token=False,  # keep last token
+
             )
             node.state = NodeState.TERMINAL
             node.stop_reason = StopReason.DONE
@@ -269,3 +300,8 @@ class TreeOfThoughtsEntropyVLLM:
             st.extend(n.children)
         return out
 
+def last_occurrence(s: str, chars: set) -> int:
+    for i in range(len(s) - 1, -1, -1):
+        if s[i] in chars:
+            return i
+    return -1
