@@ -203,7 +203,7 @@ class TreeOfThoughtsEntropyVLLM:
                     continue
                 out = chunk.outputs[0]
                 total_tokens = len(out.token_ids)
-                if total_tokens < MIN_SPLIT_TOKENS:
+                if node.depth and total_tokens < MIN_SPLIT_TOKENS:
                     continue
 
                 # --- entropy --------------------------------------------------
