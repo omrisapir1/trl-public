@@ -217,6 +217,8 @@ class TreeOfThoughtsEntropyVLLM:
                 # if at_splitable_token:
                 #     print(top.values())
                 #     print(raw_H)
+                if at_splitable_token:
+                    print(raw_H)
 
                 if (
                         len(top) > 1 and raw_H > TAU and
