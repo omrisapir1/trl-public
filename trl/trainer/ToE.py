@@ -151,10 +151,7 @@ class TreeOfThoughtsEntropyVLLM:
             last_token_id = node.completion_ids[-1]
             node.completion_ids = node.completion_ids[:-1]
         elif last_split:
-            last_index_splitable_char = last_occurrence(output.text[:LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
-            print(output.text)
-            print(last_index_splitable_char)
-            raise
+            last_index_splitable_char = last_occurrence(output.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
             node.completion_ids = self.tokenizer.encode(output.text[:last_index_splitable_char + 1  - LAST_SPLIT_MIN_CHARS])
 
 
