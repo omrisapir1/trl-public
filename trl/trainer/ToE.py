@@ -14,7 +14,7 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 MAX_STREAMS = 128
 TAU = 0.8  # threshold on EMA entropy
-TAU = [None, 0.9 , 1 , 1, 0.9 ,0.8, 0.7]
+TAU = [0.6, 0.9 , 1 , 0.9, 0.8 ,0.7, 0.6]
 TEMP = 0.99
 TOP_P = 0.9
 TOP_K = 50
@@ -217,8 +217,7 @@ class TreeOfThoughtsEntropyVLLM:
                 # if at_splitable_token:
                 #     print(top.values())
                 #     print(raw_H)
-                if at_splitable_token:
-                    print(raw_H)
+
 
                 if (
                         len(top) > 1 and raw_H > TAU[node.depth] and
