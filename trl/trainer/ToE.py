@@ -201,10 +201,11 @@ class TreeOfThoughtsEntropyVLLM:
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 if after_last_split:
                     continue
+                out = chunk.outputs[0]
                 total_tokens = len(out.token_ids)
                 if total_tokens < MIN_SPLIT_TOKENS:
                     continue
-                out = chunk.outputs[0]
+
                 # --- entropy --------------------------------------------------
                 top = {tid: -99 if np.isinf(e.logprob) else e.logprob for tid, e in out.logprobs[-1].items() } if out.logprobs else {}
                 raw_H = 0.0
