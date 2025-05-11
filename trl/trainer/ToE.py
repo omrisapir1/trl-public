@@ -22,7 +22,7 @@ REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
 MIN_SPLIT_TOKENS = 50
-LAST_SPLIT_MIN_TOKENS = 30
+LAST_SPLIT_MIN_CHARS = 30
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
@@ -151,8 +151,8 @@ class TreeOfThoughtsEntropyVLLM:
             last_token_id = node.completion_ids[-1]
             node.completion_ids = node.completion_ids[:-1]
         elif last_split:
-            last_index_splitable_char = last_occurrence(output.text[:LAST_SPLIT_MIN_TOKENS], SPLITABLE_TOKENS)
-            node.completion_ids = self.tokenizer.encode(output.text[:last_index_splitable_char + 1])
+            last_index_splitable_char = last_occurrence(output.text[:LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
+            node.completion_ids = self.tokenizer.encode(output.text[:last_index_splitable_char + 1  - LAST_SPLIT_MIN_CHARS])
 
 
         node.prompt_text = self.tokenizer.decode(node.prompt_ids)
