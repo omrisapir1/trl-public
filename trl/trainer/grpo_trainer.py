@@ -523,6 +523,9 @@ class GRPOTrainer(Trainer):
                                 gpu_memory_utilization=0.6,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=64,
+                                disable_log_stats=True,
+
+
 
                                 max_num_batched_tokens=64 * 1500,
                                 # trust_remote_code=True,
@@ -791,7 +794,7 @@ class GRPOTrainer(Trainer):
                         losses.append(loss.detach())
                         del loss
                 except:
-                    raise
+                    # raise
                     print('OUT OF MEMORY')
 
                     pass
