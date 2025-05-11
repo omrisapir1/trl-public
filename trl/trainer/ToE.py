@@ -272,7 +272,7 @@ class TreeOfThoughtsEntropyVLLM:
 
                 )
                 next_prompt_ids = node.prompt_ids + node.completion_ids
-            
+
                 for _ in range(2):
                     child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
                     node.add_child(child)
@@ -280,7 +280,7 @@ class TreeOfThoughtsEntropyVLLM:
                     self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
                 return
 
-
+            out = chunk.outputs[0]
             self._update_node_with_output(
                 node,
                 out,
