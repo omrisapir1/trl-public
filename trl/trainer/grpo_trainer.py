@@ -791,7 +791,7 @@ class GRPOTrainer(Trainer):
                         losses.append(loss.detach())
                         del loss
                 except:
-                    raise 
+                    raise
                     print('OUT OF MEMORY')
 
                     pass
