@@ -29,7 +29,7 @@ from accelerate.utils.other import is_compiled_module
 from datasets import Dataset, IterableDataset
 from packaging import version
 from torch import nn
-from torch.utils.data import Sampler, BatchSampler
+from torch.utils.data import Sampler, BatchSampler, RandomSampler
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
@@ -829,7 +829,7 @@ class GRPOTrainer(Trainer):
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
         print(inputs)
-        raise 
+        raise
         problem = [x["problem"] for x in inputs][0]
         final_answer = [x["final_answer"] for x in inputs][0]
         if mode == "train":
