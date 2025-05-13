@@ -813,7 +813,7 @@ class GRPOTrainer(Trainer):
             else:
                 loss = torch.stack(losses).mean()
 
-            del inputs
+            del inpt
             if (
                     self.args.torch_empty_cache_steps is not None
                     and self.state.global_step % self.args.torch_empty_cache_steps == 0
