@@ -289,7 +289,7 @@ class TreeOfThoughtsEntropyVLLM:
             self._update_node_with_output(
                 node,
                 out,
-                take_one_from_prompt=False,
+                take_one_from_prompt=last_occurrence_found == -1 or len(new_completion_ids) > MIN_SPLIT_TOKENS,
                 remove_last_token=False,  # keep last token
 
             )

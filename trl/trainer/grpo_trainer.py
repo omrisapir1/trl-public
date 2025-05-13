@@ -879,6 +879,7 @@ class GRPOTrainer(Trainer):
             advantages = torch.tensor([(r - mean_r) for r in child_rewards]) # / (std_r + 1e-9)
 
             # Gather IDs
+
             prompt_ids = torch.stack([torch.tensor(c.prompt_ids) for c in child_nodes], dim=0)
             completion_ids = [torch.tensor(c.completion_ids) for c in child_nodes]
             completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
