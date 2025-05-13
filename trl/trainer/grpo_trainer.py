@@ -29,7 +29,7 @@ from accelerate.utils.other import is_compiled_module
 from datasets import Dataset, IterableDataset
 from packaging import version
 from torch import nn
-from torch.utils.data import Sampler
+from torch.utils.data import Sampler, BatchSampler
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
@@ -631,6 +631,12 @@ class GRPOTrainer(Trainer):
         #                    2          7     16  16  16  17  17  17  18  18  18  19  19  19
         #                    2          8     20  20  20  21  21  21  22  22  22  23  23  23
         #                                          ...
+        return BatchSampler(
+            sampler=RandomSampler(self.train_dataset, replacement=False),
+            batch_size=self.args.per_device_train_batch_size,
+            drop_last=True,
+        )
+
         effective_batch_size = (
             self.args.per_device_train_batch_size
             * self.accelerator.num_processes
