@@ -785,7 +785,7 @@ class GRPOTrainer(Trainer):
         # Compute loss in micro-batches for each group.
         gc.collect()
         for inpt in inputs:
-            for i, group in enumerate(input):
+            for i, group in enumerate(inpt):
                 with self.compute_loss_context_manager():
                     # Compute a loss per group.
 
