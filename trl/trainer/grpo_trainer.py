@@ -517,27 +517,27 @@ class GRPOTrainer(Trainer):
 
             if self.accelerator.is_main_process:
                 pass
-                # self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
-                #                 model=model.name_or_path,
-                #                 # tensor_parallel_size=2,
-                #                 # device='cuda:1',
-                #                 gpu_memory_utilization=0.45,
-                #                 dtype=torch.bfloat16,
-                #                 max_num_seqs=128,
-                #                 disable_log_stats=True,
-                #
-                #
-                #
-                #                 max_num_batched_tokens=64 * 2500,
-                #                 # trust_remote_code=True,
-                #
-                #                 # tensor_parallel_size=2,
-                #                 # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
-                #                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
-                #                 # This is particularly useful here because we generate completions from the same prompts.
-                #                 enable_prefix_caching=self.args.vllm_enable_prefix_caching,
-                #                 # max_model_len=24000,
-                #             ))
+                self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
+                                model=model.name_or_path,
+                                # tensor_parallel_size=2,
+                                # device='cuda:1',
+                                gpu_memory_utilization=0.45,
+                                dtype=torch.bfloat16,
+                                max_num_seqs=128,
+                                disable_log_stats=True,
+
+
+
+                                max_num_batched_tokens=64 * 2500,
+                                # trust_remote_code=True,
+
+                                # tensor_parallel_size=2,
+                                # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
+                                # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
+                                # This is particularly useful here because we generate completions from the same prompts.
+                                enable_prefix_caching=self.args.vllm_enable_prefix_caching,
+                                # max_model_len=24000,
+                            ))
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -556,7 +556,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
-            # self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
+            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
@@ -784,68 +784,75 @@ class GRPOTrainer(Trainer):
         losses = []
         # Compute loss in micro-batches for each group.
         gc.collect()
-        for i, group in enumerate(inputs):
-            with self.compute_loss_context_manager():
-                # Compute a loss per group.
+        for inpt in inputs:
+            for i, group in enumerate(input):
+                with self.compute_loss_context_manager():
+                    # Compute a loss per group.
 
 
 
-                # If no valid groups are present, return a dummy loss that requires grad.
+                    # If no valid groups are present, return a dummy loss that requires grad.
 
-                try:
-                    loss = self._compute_loss_for_group(model, group)
-                    del group
-                    if loss is not None and loss.requires_grad:
+                    try:
+                        loss = self._compute_loss_for_group(model, group)
+                        del group
+                        if loss is not None and loss.requires_grad:
 
-                        self.accelerator.backward(loss, retain_graph=False)
-                        losses.append(loss.detach())
-                        del loss
-                except:
-                    # raise
-                    print('OUT OF MEMORY')
+                            self.accelerator.backward(loss, retain_graph=False)
+                            losses.append(loss.detach())
+                            del loss
+                    except:
+                        # raise
+                        print('OUT OF MEMORY')
 
-                    pass
+                        pass
 
-                    torch.cuda.empty_cache()
-        if not losses:
-            loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
-        else:
-            loss = torch.stack(losses).mean()
+                        torch.cuda.empty_cache()
+            if not losses:
+                loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
+            else:
+                loss = torch.stack(losses).mean()
 
-        del inputs
-        if (
-                self.args.torch_empty_cache_steps is not None
-                and self.state.global_step % self.args.torch_empty_cache_steps == 0
-        ):
-            torch.cuda.empty_cache()
+            del inputs
+            if (
+                    self.args.torch_empty_cache_steps is not None
+                    and self.state.global_step % self.args.torch_empty_cache_steps == 0
+            ):
+                torch.cuda.empty_cache()
 
-        if self.args.n_gpu > 1:
-            loss = loss.mean()
+            if self.args.n_gpu > 1:
+                loss = loss.mean()
 
-        # Note: With our micro-batched backward, we've already called backward on each group.
+            # Note: With our micro-batched backward, we've already called backward on each group.
         return loss.detach()
 
     @profiling_decorator
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
-        print(inputs)
-        raise
-        problem = [x["problem"] for x in inputs][0]
-        final_answer = [x["final_answer"] for x in inputs][0]
+
+        problems = [x["problem"] for x in inputs]
+        final_answers= [x["final_answer"] for x in inputs]
         if mode == "train":
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
-                tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
-                inputs = self._convert_tree_to_training_inputs(tree_root)
+                # tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
+                trees = run_async(asyncio.gather(*[
+                    self.tree_of_thought.expand_tree(p, a)
+                    for p, a in zip(problems, final_answers)
+                ]))
+                inputs = [self._convert_tree_to_training_inputs(t) for t in trees]
                 self._buffered_inputs[buffer_index] = inputs
             else:
                 inputs = buffered_inputs
             self._step += 1
         else:
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
-            tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
-            inputs = self._convert_tree_to_training_inputs(tree_root)
+            trees = run_async(asyncio.gather(*[
+                self.tree_of_thought.expand_tree(p, a)
+                for p, a in zip(problems, final_answers)
+            ]))
+            inputs = [self._convert_tree_to_training_inputs(t) for t in trees]
         return inputs
 
     def _convert_tree_to_training_inputs(self, tree_root) -> List[dict]:
