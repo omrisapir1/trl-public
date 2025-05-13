@@ -516,27 +516,28 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
-                                model=model.name_or_path,
-                                # tensor_parallel_size=2,
-                                # device='cuda:1',
-                                gpu_memory_utilization=0.45,
-                                dtype=torch.bfloat16,
-                                max_num_seqs=128,
-                                disable_log_stats=True,
-
-
-
-                                max_num_batched_tokens=64 * 2500,
-                                # trust_remote_code=True,
-
-                                # tensor_parallel_size=2,
-                                # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
-                                # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
-                                # This is particularly useful here because we generate completions from the same prompts.
-                                enable_prefix_caching=self.args.vllm_enable_prefix_caching,
-                                # max_model_len=24000,
-                            ))
+                pass
+                # self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
+                #                 model=model.name_or_path,
+                #                 # tensor_parallel_size=2,
+                #                 # device='cuda:1',
+                #                 gpu_memory_utilization=0.45,
+                #                 dtype=torch.bfloat16,
+                #                 max_num_seqs=128,
+                #                 disable_log_stats=True,
+                #
+                #
+                #
+                #                 max_num_batched_tokens=64 * 2500,
+                #                 # trust_remote_code=True,
+                #
+                #                 # tensor_parallel_size=2,
+                #                 # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
+                #                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
+                #                 # This is particularly useful here because we generate completions from the same prompts.
+                #                 enable_prefix_caching=self.args.vllm_enable_prefix_caching,
+                #                 # max_model_len=24000,
+                #             ))
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -555,7 +556,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
-            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
+            # self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
@@ -821,6 +822,8 @@ class GRPOTrainer(Trainer):
     @profiling_decorator
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
+        print(inputs)
+        raise 
         problem = [x["problem"] for x in inputs][0]
         final_answer = [x["final_answer"] for x in inputs][0]
         if mode == "train":

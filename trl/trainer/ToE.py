@@ -6,22 +6,25 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional
-from .extract_answer import extract_final_answer, math_equal
+try:
+    from .extract_answer import extract_final_answer, math_equal
+except:
+    from extract_answer import extract_final_answer, math_equal
 from transformers import AutoTokenizer
 from vllm import SamplingParams
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 1.2  # threshold on EMA entropy
+TAU = 1  # threshold on EMA entropy
 # TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
-TEMP = 0.99
+TEMP = 0.8
 TOP_P = 0.9
 TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
-MIN_SPLIT_TOKENS = 100
+MIN_SPLIT_TOKENS = 80
 LAST_SPLIT_MIN_CHARS = 30
 
 
@@ -139,7 +142,7 @@ class TreeOfThoughtsEntropyVLLM:
             return 0
 
     def _update_node_with_output(self, node: TreeNode, output: Any, take_one_from_prompt: bool,
-                                 remove_last_token: bool, last_split=False) -> int:
+                                 remove_last_token: bool, new_completion_ids=None) -> int:
         last_token_id = None
         init_addition_tokens = []
         if take_one_from_prompt:
@@ -150,10 +153,8 @@ class TreeOfThoughtsEntropyVLLM:
         if remove_last_token:
             last_token_id = node.completion_ids[-1]
             node.completion_ids = node.completion_ids[:-1]
-        elif last_split:
-            last_index_splitable_char = last_occurrence(output.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
-            node.completion_ids = self.tokenizer.encode(output.text[:last_index_splitable_char + 1  - LAST_SPLIT_MIN_CHARS])
-
+        elif new_completion_ids:
+            node.completion_ids = new_completion_ids
 
         node.prompt_text = self.tokenizer.decode(node.prompt_ids)
         node.completion_text = self.tokenizer.decode(node.completion_ids)
@@ -263,22 +264,26 @@ class TreeOfThoughtsEntropyVLLM:
 
 
             if not after_last_split:
-                self._update_node_with_output(
-                    node,
-                    out,
-                    take_one_from_prompt=(node.depth != 0),
-                    remove_last_token=False,
-                    last_split=True,
+                last_occurrence_found = last_occurrence(out.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
+                new_completion_ids = self.tokenizer.encode(out.text[:last_occurrence_found + 1])
+                if last_occurrence_found != -1 and len(new_completion_ids) > MIN_SPLIT_TOKENS:
 
-                )
-                next_prompt_ids = node.prompt_ids + node.completion_ids
+                    self._update_node_with_output(
+                        node,
+                        out,
+                        take_one_from_prompt=(node.depth != 0),
+                        remove_last_token=False,
+                        new_completion_ids=new_completion_ids,
 
-                for _ in range(2):
-                    child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
-                    node.add_child(child)
-                    self._tasks = getattr(self, "_tasks", [])
-                    self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                return
+                    )
+                    next_prompt_ids = node.prompt_ids + node.completion_ids
+
+                    for _ in range(2):
+                        child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
+                        node.add_child(child)
+                        self._tasks = getattr(self, "_tasks", [])
+                        self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
+                    return
 
             out = chunk.outputs[0]
             self._update_node_with_output(
