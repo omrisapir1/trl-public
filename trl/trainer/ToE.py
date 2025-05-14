@@ -16,15 +16,15 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 0.8  # threshold on EMA entropy
+TAU = 0.5  # threshold on EMA entropy
 # TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
-TEMP = 0.8
+TEMP = 0.9
 TOP_P = 0.9
 TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
-MIN_SPLIT_TOKENS = 70
+MIN_SPLIT_TOKENS = 60
 LAST_SPLIT_MIN_CHARS = 30
 
 
