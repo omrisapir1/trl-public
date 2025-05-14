@@ -525,6 +525,7 @@ class GRPOTrainer(Trainer):
                                 dtype=torch.bfloat16,
                                 max_num_seqs=128,
                                 disable_log_stats=True,
+                                log_requests=False,
 
 
 
