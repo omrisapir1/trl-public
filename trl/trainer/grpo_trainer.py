@@ -992,6 +992,9 @@ class GRPOTrainer(Trainer):
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
+        print(per_token_loss)
+        print(completion_mask)
+        print(loss)
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_logps
         torch.cuda.empty_cache()
         # Log the metrics
