@@ -893,26 +893,26 @@ class GRPOTrainer(Trainer):
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
             attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
             logits_to_keep = completion_ids.size(1)
+            ref_per_token_logps = None
+            if self.beta:
+                max_chunk_size = 2
+                batch_size = prompt_completion_ids.size(0)
+                outputs = []
+                for i in range(0, batch_size, max_chunk_size):
+                    p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
+                    m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
+                    with torch.no_grad():
+                        sub_output = self._get_per_token_logps(
+                            self.ref_model,
+                            p_chunk,
+                            m_chunk,
+                            logits_to_keep
+                        )
+                    if sub_output is None:
+                        return  # Skip this group
+                    outputs.append(sub_output)
 
-
-            max_chunk_size = 2
-            batch_size = prompt_completion_ids.size(0)
-            outputs = []
-            for i in range(0, batch_size, max_chunk_size):
-                p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-                with torch.no_grad():
-                    sub_output = self._get_per_token_logps(
-                        self.ref_model,
-                        p_chunk,
-                        m_chunk,
-                        logits_to_keep
-                    )
-                if sub_output is None:
-                    return  # Skip this group
-                outputs.append(sub_output)
-
-            ref_per_token_logps = torch.cat(outputs, dim=0)
+                ref_per_token_logps = torch.cat(outputs, dim=0)
 
             # Build group dict
             group_dicts.append({
