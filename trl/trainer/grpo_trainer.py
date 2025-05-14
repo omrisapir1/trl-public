@@ -525,7 +525,7 @@ class GRPOTrainer(Trainer):
                                 dtype=torch.bfloat16,
                                 max_num_seqs=128,
                                 disable_log_stats=True,
-                                log_requests=False,
+
 
 
 
@@ -538,7 +538,7 @@ class GRPOTrainer(Trainer):
                                 # This is particularly useful here because we generate completions from the same prompts.
                                 enable_prefix_caching=self.args.vllm_enable_prefix_caching,
                                 # max_model_len=24000,
-                            ))
+                            ),log_requests=False)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
