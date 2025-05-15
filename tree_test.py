@@ -13,7 +13,7 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, num_train_epochs=1,logging_steps=20,save_steps=1500, ref_model_sync_steps=2000,beta=0.01,bf16=True)
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, num_train_epochs=1,logging_steps=20,save_steps=1500, ref_model_sync_steps=2000,beta=0.01,bf16=True,num_generations=1)
 
 
 trainer = GRPOTrainer(
