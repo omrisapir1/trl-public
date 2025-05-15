@@ -290,7 +290,7 @@ class TreeOfThoughtsEntropyVLLM:
 
                 else:
                     take_one_from_prompt = True
-                    next_prompt_ids = node.prompt_ids
+                    next_prompt_ids = node.prompt_ids[:-1]
                     child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
                     node.parent.add_child(child)
                     self._tasks = getattr(self, "_tasks", [])
