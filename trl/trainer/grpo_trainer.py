@@ -521,15 +521,15 @@ class GRPOTrainer(Trainer):
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
-                                gpu_memory_utilization=0.2,
+                                gpu_memory_utilization=0.5,
                                 dtype=torch.bfloat16,
-                                max_num_seqs=64,
+                                max_num_seqs=256,
                                 disable_log_stats=True,
 
 
 
 
-                                max_num_batched_tokens=64 * 1000,
+                                max_num_batched_tokens=64 * 3000,
                                 # trust_remote_code=True,
 
                                 # tensor_parallel_size=2,
@@ -775,66 +775,70 @@ class GRPOTrainer(Trainer):
     #         self.vllm_client.reset_prefix_cache()
 
     def training_step(
-        self,
-        model: nn.Module,
-        inputs: dict[str, Union[torch.Tensor, Any]],
-        num_items_in_batch= None,
+            self,
+            model: nn.Module,
+            inputs: dict[str, Union[torch.Tensor, Any]],
+            num_items_in_batch=None,
     ) -> torch.Tensor:
         """GRPO optimisation step with **per‑prompt** loss averaging.
 
-        *Each prompt* (i.e. each root in the current batch) generates a list of
-        sibling‑groups via :py:meth:`_prepare_inputs`.  For stability we:
+        Each *prompt* (root in the current batch) yields a list of sibling‑groups
+        via :py:meth:`_prepare_inputs`.  We
 
-        1. compute a loss for every group;
-        2. *average* the losses belonging to the **same prompt**;
-        3. back‑prop **once** per prompt (lower gradient variance, fair weighting);
-        4. return the mean of all prompt losses for logging.
+        1. compute a loss for every sibling‑group;
+        2. average those losses *within the same prompt*;
+        3. perform **one** backward per prompt (lower variance, same gradient as
+           all‑at‑once);
+        4. return the mean of prompt losses for logging / scheduler.
         """
 
-        import gc  # local import to avoid pollution at top of file
+        import gc  # local import avoids top‑level pollution
 
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
 
-        # ─── Expand prompts into Tree‑of‑Thought groups ──────────────────────────
-        batch_groups: list[list[dict]] = self._prepare_inputs(inputs)  # one inner‑list per prompt
+        # ── Expand prompts into Tree‑of‑Thought group lists ──────────────────
+        # ``batch_groups`` is List[List[group_dict]], len == batch size
+        batch_groups: list[list[dict]] = self._prepare_inputs(inputs)
 
-        total_prompt_losses: list[torch.Tensor] = []  # for scalar logging only
+        total_prompt_losses: list[torch.Tensor] = []  # for scalar logging
         gc.collect()
 
-        # ─── Loop over prompts ───────────────────────────────────────────────────
+        # ── Loop over prompts ────────────────────────────────────────────────
         for group_list in batch_groups:
+            if not group_list:  # safety – can happen when a tree produced no groups
+                continue
+
             prompt_losses: list[torch.Tensor] = []
 
-            # compute each sibling‑group loss (no backward yet)
             for group in group_list:
                 with self.compute_loss_context_manager():
                     try:
                         loss = self._compute_loss_for_group(model, group)
                     except RuntimeError as err:
-                        # OOM / numerical issue – skip this group
-                        print("[GRPO] skipping group due to error:", err)
+                        # OOM / NaNs – skip this group, free memory
+                        print("[GRPO] Skipping group due to error:", err)
                         torch.cuda.empty_cache()
                         continue
 
                 if loss is not None and loss.requires_grad:
-                    prompt_losses.append(loss)
+                    # scale so backward accumulates prompt‑mean
+                    scaled_loss = loss / len(group_list)
+                    self.accelerator.backward(scaled_loss)
+                    prompt_losses.append(loss.detach())  # for stats only
 
-                # free graph early
+                # free ASAP
                 del group, loss
                 torch.cuda.empty_cache()
 
-            # average over groups of *this* prompt, then backward once
             if prompt_losses:
-                prompt_loss = torch.stack(prompt_losses).mean()
-                self.accelerator.backward(prompt_loss)
-                total_prompt_losses.append(prompt_loss.detach())
+                total_prompt_losses.append(torch.stack(prompt_losses).mean())
 
             del prompt_losses
             torch.cuda.empty_cache()
 
-        # ─── Scalar loss for HF Trainer bookkeeping ─────────────────────────────
+        # ── Scalar loss for HF Trainer bookkeeping ──────────────────────────
         if not total_prompt_losses:
             scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
         else:
@@ -844,8 +848,8 @@ class GRPOTrainer(Trainer):
             scalar_loss = scalar_loss.mean()
 
         if (
-            self.args.torch_empty_cache_steps is not None
-            and self.state.global_step % self.args.torch_empty_cache_steps == 0
+                self.args.torch_empty_cache_steps is not None
+                and self.state.global_step % self.args.torch_empty_cache_steps == 0
         ):
             torch.cuda.empty_cache()
 
