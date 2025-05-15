@@ -884,81 +884,104 @@ class GRPOTrainer(Trainer):
             inputs = [self._convert_tree_to_training_inputs(t) for t in trees]
         return inputs
 
-    def _convert_tree_to_training_inputs(self, tree_root) -> List[dict]:
+    def _convert_tree_to_training_inputs(self, tree_root) -> list[dict]:
+        """Traverse *tree_root* and build group dictionaries.
+
+        * If a node has **>2 children**, the resulting tensors can be large.
+          To keep peak memory low we *chunk* such tensors into mini‑groups of
+          at most **2 children each** before returning.  Down‑stream code
+          (loss / backward) already loops over *every* group dict, so no other
+          change is required.
+        """
+
         if self.state.global_step != self._last_loaded_step:
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
 
-        device = self.accelerator.device
-        group_dicts = []  # We'll accumulate the final group dicts here
+        group_dicts: list[dict] = []  # output container
+        pad_id = self.processing_class.pad_token_id
 
+        # -------------------------------------------------- local helpers --
+        def build_group(child_slice: slice, prom_ids, comp_ids, prom_mask,
+                        comp_mask, adv, ref_lp):
+            """Create a *single* group dict from slice indices."""
+            return {
+                "prompt_ids":           prom_ids[child_slice].clone(),
+                "prompt_mask":          prom_mask[child_slice].clone(),
+                "completion_ids":       comp_ids[child_slice].clone(),
+                "completion_mask":      comp_mask[child_slice].clone(),
+                "advantages":           adv[child_slice].clone(),
+                "old_per_token_logps":  None,  # filled later if needed
+                "ref_per_token_logps":  None if ref_lp is None else ref_lp[child_slice].clone(),
+            }
+
+        # -------------------------------------------------- DFS traversal --
         def process_node(node):
             if len(node.children) < 2:
-                return  # Not a group (no or single child)
+                return  # need at least two siblings for a meaningful group
 
-            # Collect rewards and filter invalid completions
             child_nodes = [c for c in node.children if c.reward is not None]
+            if len(child_nodes) < 2:
+                return
 
-            child_rewards = [c.reward for c in child_nodes]
-            std_r = torch.tensor(child_rewards).float().std()
+            # ----- compute advantages ------------------------------------
+            child_rewards = torch.tensor([c.reward for c in child_nodes], dtype=torch.float32)
+            std_r = child_rewards.std()
             if std_r <= 1e-9:
-                return  # Avoid dividing by near-zero std
+                return  # degenerate reward distribution
+            mean_r = child_rewards.mean()
+            advantages = (child_rewards - mean_r)  # / std_r  (optional norm)
 
-            mean_r = sum(child_rewards) / len(child_rewards)
-            advantages = torch.tensor([(r - mean_r) for r in child_rewards]) # / (std_r + 1e-9)
+            # ----- build token tensors -----------------------------------
+            prompt_ids      = torch.stack([torch.tensor(c.prompt_ids)     for c in child_nodes])
+            completion_list = [torch.tensor(c.completion_ids)             for c in child_nodes]
+            completion_ids  = pad(completion_list, padding_value=pad_id)
 
-            # Gather IDs
+            prompt_mask     = torch.ones_like(prompt_ids)
+            completion_mask = (completion_ids != pad_id).long()
 
-            prompt_ids = torch.stack([torch.tensor(c.prompt_ids) for c in child_nodes], dim=0)
-            completion_ids = [torch.tensor(c.completion_ids) for c in child_nodes]
-            completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
-
-            prompt_mask = torch.ones_like(prompt_ids)
-            completion_mask = (completion_ids != self.processing_class.pad_token_id).long()
-
-            # Prepare for ref logps
-            prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
-            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
-            logits_to_keep = completion_ids.size(1)
-            ref_per_token_logps = None
+            # ----- optional ref‑model log‑probs ---------------------------
+            ref_per_token_lp = None
             if self.beta:
-                max_chunk_size = 2
-                batch_size = prompt_completion_ids.size(0)
-                outputs = []
-                for i in range(0, batch_size, max_chunk_size):
-                    p_chunk = prompt_completion_ids[i:i + max_chunk_size].to(self.ref_model.device)
-                    m_chunk = attention_mask[i:i + max_chunk_size].to(self.ref_model.device)
-                    with torch.no_grad():
-                        sub_output = self._get_per_token_logps(
-                            self.ref_model,
-                            p_chunk,
-                            m_chunk,
-                            logits_to_keep
-                        )
-                    if sub_output is None:
-                        return  # Skip this group
-                    outputs.append(sub_output)
+                with torch.no_grad():
+                    pc_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+                    att_m  = torch.cat([prompt_mask, completion_mask], dim=1)
+                    logits_to_keep = completion_ids.size(1)
 
-                ref_per_token_logps = torch.cat(outputs, dim=0)
+                    chunks = []
+                    max_chunk = 2  # small chunk to save memory
+                    for i in range(0, pc_ids.size(0), max_chunk):
+                        p_chunk = pc_ids[i:i+max_chunk].to(self.ref_model.device)
+                        m_chunk = att_m[i:i+max_chunk].to(self.ref_model.device)
+                        out = self._get_per_token_logps(self.ref_model, p_chunk, m_chunk, logits_to_keep)
+                        if out is None:
+                            continue
+                        chunks.append(out.cpu())
+                    if chunks:
+                        ref_per_token_lp = torch.cat(chunks, dim=0)
 
-            # Build group dict
-            group_dicts.append({
-                "prompt_ids": prompt_ids,
-                "prompt_mask": prompt_mask,
-                "completion_ids": completion_ids,
-                "completion_mask": completion_mask,
-                "advantages": advantages,
-                "old_per_token_logps": None,  # or fill in if needed
-                "ref_per_token_logps": ref_per_token_logps,
-            })
+            # ----- split into smaller dicts if many children --------------
+            num_children = prompt_ids.size(0)
+            if num_children > 2:
+                step = 2  # hard‑coded chunk of 2 rows
+                for start in range(0, num_children, step):
+                    sl = slice(start, min(start+step, num_children))
+                    group_dicts.append(
+                        build_group(sl, prompt_ids, completion_ids, prompt_mask,
+                                     completion_mask, advantages, ref_per_token_lp)
+                    )
+            else:
+                group_dicts.append(
+                    build_group(slice(0, num_children), prompt_ids, completion_ids, prompt_mask,
+                                 completion_mask, advantages, ref_per_token_lp)
+                )
 
-            # Recurse down the tree
+            # recurse into children
             for child in child_nodes:
                 process_node(child)
 
-        # Start recursion
+        # kick‑off DFS
         process_node(tree_root)
-
         return group_dicts
 
 
