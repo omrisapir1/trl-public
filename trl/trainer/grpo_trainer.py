@@ -775,69 +775,77 @@ class GRPOTrainer(Trainer):
     #         self.vllm_client.reset_prefix_cache()
 
     def training_step(
-            self,
-            model: nn.Module,
-            inputs: dict[str, Union[torch.Tensor, Any]],
-            num_items_in_batch: int | None = None,
+        self,
+        model: nn.Module,
+        inputs: dict[str, Union[torch.Tensor, Any]],
+        num_items_in_batch= None,
     ) -> torch.Tensor:
-        """Runs one optimisation step.
+        """GRPO optimisation step with **per‑prompt** loss averaging.
 
-        * ``inputs`` is the raw batch coming from the DataLoader.
-        * ``self._prepare_inputs`` turns that into **a list of group‑lists**, one entry per
-          prompt in the batch.  Each inner list contains the Tree‑of‑Thought groups for
-          that prompt.
-        * For every *group* we compute a GRPO loss **and call backward immediately** –
-          exactly as the DeepSeek‑GRPO paper describes.
+        *Each prompt* (i.e. each root in the current batch) generates a list of
+        sibling‑groups via :py:meth:`_prepare_inputs`.  For stability we:
 
-        Gradients are therefore already in the optimiser after the loop; the *scalar loss*
-        we return is only used for logging / lr‑scheduling, so we compute it as the mean of
-        all group losses in the batch.
+        1. compute a loss for every group;
+        2. *average* the losses belonging to the **same prompt**;
+        3. back‑prop **once** per prompt (lower gradient variance, fair weighting);
+        4. return the mean of all prompt losses for logging.
         """
+
+        import gc  # local import to avoid pollution at top of file
 
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
 
-        # ─── Expand prompt trees & convert to tensors ────────────────────────
-        batch_groups = self._prepare_inputs(inputs)  # List[list[group‑dict]]
+        # ─── Expand prompts into Tree‑of‑Thought groups ──────────────────────────
+        batch_groups: list[list[dict]] = self._prepare_inputs(inputs)  # one inner‑list per prompt
 
-        # ─── Iterate over *all* groups (flattened) ───────────────────────────
-        total_losses: list[torch.Tensor] = []
+        total_prompt_losses: list[torch.Tensor] = []  # for scalar logging only
         gc.collect()
 
-        for group_list in batch_groups:  # loop over prompts in this batch
-            for group in group_list:  # loop over sibling completions
+        # ─── Loop over prompts ───────────────────────────────────────────────────
+        for group_list in batch_groups:
+            prompt_losses: list[torch.Tensor] = []
+
+            # compute each sibling‑group loss (no backward yet)
+            for group in group_list:
                 with self.compute_loss_context_manager():
                     try:
                         loss = self._compute_loss_for_group(model, group)
-                    except RuntimeError as err:  # OOM or other numerical issue
+                    except RuntimeError as err:
+                        # OOM / numerical issue – skip this group
                         print("[GRPO] skipping group due to error:", err)
                         torch.cuda.empty_cache()
                         continue
 
-                # Back‑prop *immediately* – retain_graph not needed (no reuse)
                 if loss is not None and loss.requires_grad:
-                    self.accelerator.backward(loss)
-                    total_losses.append(loss.detach())
+                    prompt_losses.append(loss)
 
-                # release buffers early
+                # free graph early
                 del group, loss
                 torch.cuda.empty_cache()
 
-        # ─── Produce scalar loss for Trainer bookkeeping ────────────────────
-        if not total_losses:
+            # average over groups of *this* prompt, then backward once
+            if prompt_losses:
+                prompt_loss = torch.stack(prompt_losses).mean()
+                self.accelerator.backward(prompt_loss)
+                total_prompt_losses.append(prompt_loss.detach())
+
+            del prompt_losses
+            torch.cuda.empty_cache()
+
+        # ─── Scalar loss for HF Trainer bookkeeping ─────────────────────────────
+        if not total_prompt_losses:
             scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
         else:
-            scalar_loss = torch.stack(total_losses).mean()
+            scalar_loss = torch.stack(total_prompt_losses).mean()
 
-        # Gradient accumulation handled by HF/Accelerate outside this method.
         if self.args.n_gpu > 1:
             scalar_loss = scalar_loss.mean()
 
-        # periodic cache clean‑up
         if (
-                self.args.torch_empty_cache_steps is not None
-                and self.state.global_step % self.args.torch_empty_cache_steps == 0
+            self.args.torch_empty_cache_steps is not None
+            and self.state.global_step % self.args.torch_empty_cache_steps == 0
         ):
             torch.cuda.empty_cache()
 
