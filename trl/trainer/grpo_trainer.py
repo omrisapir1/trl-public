@@ -774,60 +774,74 @@ class GRPOTrainer(Trainer):
     #     if self.accelerator.is_main_process:
     #         self.vllm_client.reset_prefix_cache()
 
-    def training_step(self, model: nn.Module, inputs: dict[str, Union[torch.Tensor, Any]],
-                      num_items_in_batch=None) -> torch.Tensor:
+    def training_step(
+            self,
+            model: nn.Module,
+            inputs: dict[str, Union[torch.Tensor, Any]],
+            num_items_in_batch: int | None = None,
+    ) -> torch.Tensor:
+        """Runs one optimisation step.
+
+        * ``inputs`` is the raw batch coming from the DataLoader.
+        * ``self._prepare_inputs`` turns that into **a list of group‑lists**, one entry per
+          prompt in the batch.  Each inner list contains the Tree‑of‑Thought groups for
+          that prompt.
+        * For every *group* we compute a GRPO loss **and call backward immediately** –
+          exactly as the DeepSeek‑GRPO paper describes.
+
+        Gradients are therefore already in the optimiser after the loop; the *scalar loss*
+        we return is only used for logging / lr‑scheduling, so we compute it as the mean of
+        all group losses in the batch.
+        """
 
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
             self.optimizer.train()
 
-        # Prepare inputs: now returns a list of group dictionaries.
-        inputs = self._prepare_inputs(inputs)
+        # ─── Expand prompt trees & convert to tensors ────────────────────────
+        batch_groups = self._prepare_inputs(inputs)  # List[list[group‑dict]]
 
-        losses = []
-        # Compute loss in micro-batches for each group.
+        # ─── Iterate over *all* groups (flattened) ───────────────────────────
+        total_losses: list[torch.Tensor] = []
         gc.collect()
-        for inpt in inputs:
-            for i, group in enumerate(inpt):
+
+        for group_list in batch_groups:  # loop over prompts in this batch
+            for group in group_list:  # loop over sibling completions
                 with self.compute_loss_context_manager():
-                    # Compute a loss per group.
-
-
-
-                    # If no valid groups are present, return a dummy loss that requires grad.
-
                     try:
                         loss = self._compute_loss_for_group(model, group)
-                        del group
-                        if loss is not None and loss.requires_grad:
-
-                            self.accelerator.backward(loss, retain_graph=False)
-                            losses.append(loss.detach())
-                            del loss
-                    except:
-                        # raise
-                        print('OUT OF MEMORY')
-
-                        pass
-
+                    except RuntimeError as err:  # OOM or other numerical issue
+                        print("[GRPO] skipping group due to error:", err)
                         torch.cuda.empty_cache()
-            if not losses:
-                loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
-            else:
-                loss = torch.stack(losses).mean()
+                        continue
 
-            del inpt
-            if (
-                    self.args.torch_empty_cache_steps is not None
-                    and self.state.global_step % self.args.torch_empty_cache_steps == 0
-            ):
+                # Back‑prop *immediately* – retain_graph not needed (no reuse)
+                if loss is not None and loss.requires_grad:
+                    self.accelerator.backward(loss)
+                    total_losses.append(loss.detach())
+
+                # release buffers early
+                del group, loss
                 torch.cuda.empty_cache()
 
-            if self.args.n_gpu > 1:
-                loss = loss.mean()
+        # ─── Produce scalar loss for Trainer bookkeeping ────────────────────
+        if not total_losses:
+            scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
+        else:
+            scalar_loss = torch.stack(total_losses).mean()
 
-            # Note: With our micro-batched backward, we've already called backward on each group.
-        return loss.detach()
+        # Gradient accumulation handled by HF/Accelerate outside this method.
+        if self.args.n_gpu > 1:
+            scalar_loss = scalar_loss.mean()
+
+        # periodic cache clean‑up
+        if (
+                self.args.torch_empty_cache_steps is not None
+                and self.state.global_step % self.args.torch_empty_cache_steps == 0
+        ):
+            torch.cuda.empty_cache()
+
+        return scalar_loss.detach()
 
     @profiling_decorator
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
