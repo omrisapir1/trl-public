@@ -189,7 +189,7 @@ class TreeOfThoughtsEntropyVLLM:
         return root
 
     # ---------------------------------------------------------------- spawn ---
-    async def _spawn(self, node: TreeNode, answer: str, after_last_split=False, max_toekns=None):
+    async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
 
         async with self.sem:
             params = SamplingParams(
@@ -197,7 +197,7 @@ class TreeOfThoughtsEntropyVLLM:
                 top_p=TOP_P,
                 top_k=TOP_K,
                 repetition_penalty=REP_PENALTY,
-                max_tokens=max_toekns if max_toekns else MAX_TOKENS_GEN_PER_DEPTH[node.depth],
+                max_tokens=MAX_TOKENS_GEN_PER_DEPTH[node.depth],
                 logprobs=LOGPROBS_K,
             )
             prompt_text = self.tokenizer.decode(node.prompt_ids)
@@ -295,7 +295,7 @@ class TreeOfThoughtsEntropyVLLM:
                     child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
                     node.parent.add_child(child)
                     self._tasks = getattr(self, "_tasks", [])
-                    self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True, max_tokens=500)))
+                    self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
 
 
 
