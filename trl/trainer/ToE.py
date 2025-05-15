@@ -196,7 +196,7 @@ class TreeOfThoughtsEntropyVLLM:
                 top_p=TOP_P,
                 top_k=TOP_K,
                 repetition_penalty=REP_PENALTY,
-                max_tokens=MAX_TOKENS_GEN,
+                max_tokens=MAX_TOKENS_GEN * 2*(node.depth<2),
                 logprobs=LOGPROBS_K,
             )
             prompt_text = self.tokenizer.decode(node.prompt_ids)
