@@ -16,7 +16,7 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 0.6  # threshold on EMA entropy
+TAU = 1.2#0.6  # threshold on EMA entropy
 # TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
 TEMP = 0.9
 TOP_P = 0.9
@@ -24,7 +24,7 @@ TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
-MIN_SPLIT_TOKENS = 70
+MIN_SPLIT_TOKENS = 120#70
 LAST_SPLIT_MIN_CHARS = 150
 
 
@@ -286,15 +286,16 @@ class TreeOfThoughtsEntropyVLLM:
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                    return
+
                 else:
                     for _ in range(2):
+                        
                         next_prompt_ids = node.prompt_ids
                         child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
                         node.parent.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                    return
+                return
 
 
 
