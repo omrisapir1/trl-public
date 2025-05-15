@@ -23,7 +23,7 @@ TOP_P = 0.9
 TOP_K = 50
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
-MAX_TOKENS_GEN = 2000
+MAX_TOKENS_GEN_PER_DEPTH = [5,3000,1500,1200,1000,1000,1000,1000]
 MIN_SPLIT_TOKENS = 80
 LAST_SPLIT_MIN_CHARS = 150
 
@@ -190,13 +190,14 @@ class TreeOfThoughtsEntropyVLLM:
 
     # ---------------------------------------------------------------- spawn ---
     async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
+
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
                 top_p=TOP_P,
                 top_k=TOP_K,
                 repetition_penalty=REP_PENALTY,
-                max_tokens=MAX_TOKENS_GEN * 2*(node.depth<2),
+                max_tokens=MAX_TOKENS_GEN_PER_DEPTH[node.depth],
                 logprobs=LOGPROBS_K,
             )
             prompt_text = self.tokenizer.decode(node.prompt_ids)
