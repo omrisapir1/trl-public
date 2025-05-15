@@ -265,7 +265,7 @@ class TreeOfThoughtsEntropyVLLM:
                     return  # stop parent stream
                 at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
 
-
+            take_one_from_prompt = False
             if not after_last_split:
                 last_occurrence_found = last_occurrence(out.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
                 new_completion_ids = self.tokenizer.encode(out.text[:last_occurrence_found + 1])
@@ -286,16 +286,16 @@ class TreeOfThoughtsEntropyVLLM:
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
+                    return
 
                 else:
-                    for _ in range(2):
-                        
-                        next_prompt_ids = node.prompt_ids
-                        child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
-                        node.parent.add_child(child)
-                        self._tasks = getattr(self, "_tasks", [])
-                        self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                return
+                    take_one_from_prompt = True
+                    next_prompt_ids = node.prompt_ids
+                    child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
+                    node.parent.add_child(child)
+                    self._tasks = getattr(self, "_tasks", [])
+                    self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
+
 
 
 
@@ -304,7 +304,7 @@ class TreeOfThoughtsEntropyVLLM:
             self._update_node_with_output(
                 node,
                 out,
-                take_one_from_prompt=False,
+                take_one_from_prompt=take_one_from_prompt,
                 remove_last_token=False,  # keep last token
 
             )
