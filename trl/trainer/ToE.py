@@ -270,7 +270,6 @@ class TreeOfThoughtsEntropyVLLM:
                 last_occurrence_found = last_occurrence(out.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
                 new_completion_ids = self.tokenizer.encode(out.text[:last_occurrence_found + 1])
                 if last_occurrence_found != -1 and len(new_completion_ids) > MIN_SPLIT_TOKENS:
-                    print(out)
 
                     self._update_node_with_output(
                         node,
