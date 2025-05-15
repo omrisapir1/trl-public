@@ -25,7 +25,7 @@ REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS_GEN = 4000
 MIN_SPLIT_TOKENS = 70
-LAST_SPLIT_MIN_CHARS = 30
+LAST_SPLIT_MIN_CHARS = 150
 
 
 SAVE_DIR = Path("training_data_entropy_vllm");
@@ -164,7 +164,7 @@ class TreeOfThoughtsEntropyVLLM:
     async def expand_tree(self, problem: str, answer: str) -> TreeNode:
         self.cur_split_count = 0
         root = TreeNode(self._prompt(problem))
-        await self._spawn(root, answer)
+        await self._spawn(root, answer, None)
         if hasattr(self, "_tasks") and self._tasks:
             await asyncio.gather(*self._tasks)
 
@@ -186,7 +186,7 @@ class TreeOfThoughtsEntropyVLLM:
         return root
 
     # ---------------------------------------------------------------- spawn ---
-    async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
+    async def _spawn(self, node: TreeNode, answer: str, parent:TreeNode, after_last_split=False):
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
@@ -258,11 +258,11 @@ class TreeOfThoughtsEntropyVLLM:
                         child = TreeNode(next_prompt_ids + [forced], depth=node.depth + 1, parent=node)
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
-                        self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
+                        self._tasks.append(asyncio.create_task(self._spawn(child, answer, node)))
                     return  # stop parent stream
                 at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
 
-            last_take_one_from_prompt = False
+
             if not after_last_split:
                 last_occurrence_found = last_occurrence(out.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
                 new_completion_ids = self.tokenizer.encode(out.text[:last_occurrence_found + 1])
@@ -278,20 +278,29 @@ class TreeOfThoughtsEntropyVLLM:
                     )
                     next_prompt_ids = node.prompt_ids + node.completion_ids
 
-                    for _ in range(2):
+                    for _ in range(4):
                         child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
                     return
                 else:
-                    last_take_one_from_prompt = True
+                    for _ in range(2):
+                        next_prompt_ids = node.prompt_ids
+                        child = TreeNode(next_prompt_ids, depth=node.depth, parent=parent, after_last_split=True)
+                        parent.add_child(child)
+                        self._tasks = getattr(self, "_tasks", [])
+                        self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
+                    return
+
+
+
 
             out = chunk.outputs[0]
             self._update_node_with_output(
                 node,
                 out,
-                take_one_from_prompt=last_take_one_from_prompt,
+                take_one_from_prompt=False,
                 remove_last_token=False,  # keep last token
 
             )
