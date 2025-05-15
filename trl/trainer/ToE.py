@@ -28,11 +28,14 @@ MIN_SPLIT_TOKENS = 70
 LAST_SPLIT_MIN_CHARS = 150
 
 
-SAVE_DIR = Path("training_data_entropy_vllm");
+
 from pathlib import Path
 import shutil
 
 SAVE_DIR = Path("training_data_entropy_vllm")
+if not os.path.exists(SAVE_DIR):
+    os.mkdir(SAVE_DIR)
+
 
 # Iterate over everything directly inside the directory
 for child in SAVE_DIR.iterdir():
@@ -186,7 +189,7 @@ class TreeOfThoughtsEntropyVLLM:
         return root
 
     # ---------------------------------------------------------------- spawn ---
-    async def _spawn(self, node: TreeNode, answer: str, parent:TreeNode, after_last_split=False):
+    async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
@@ -258,7 +261,7 @@ class TreeOfThoughtsEntropyVLLM:
                         child = TreeNode(next_prompt_ids + [forced], depth=node.depth + 1, parent=node)
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
-                        self._tasks.append(asyncio.create_task(self._spawn(child, answer, node)))
+                        self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
                     return  # stop parent stream
                 at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
 
@@ -287,8 +290,8 @@ class TreeOfThoughtsEntropyVLLM:
                 else:
                     for _ in range(2):
                         next_prompt_ids = node.prompt_ids
-                        child = TreeNode(next_prompt_ids, depth=node.depth, parent=parent, after_last_split=True)
-                        parent.add_child(child)
+                        child = TreeNode(next_prompt_ids, depth=node.depth, parent=node.parent)
+                        node.parent.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
                     return
