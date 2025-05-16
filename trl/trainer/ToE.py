@@ -238,7 +238,7 @@ class TreeOfThoughtsEntropyVLLM:
 
                 if (
                         len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
-                        and at_splitable_token
+                        and at_splitable_token and not out.text[-1] in SPLITABLE_TOKENS
                         # self.cur_split_count < MAX_TOTAL_SPLITS
                 ) or (node.depth==0):
 
@@ -253,7 +253,7 @@ class TreeOfThoughtsEntropyVLLM:
                     )
                     next_prompt_ids = node.prompt_ids + node.completion_ids
 
-                    cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t != tok_id])
+                    cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t == tok_id])
                     probs = np.exp(np.array(cand_lps) / TEMP);
                     probs /= probs.sum()
                     alt_tid = int(np.random.choice(cand_ids, p=probs))
