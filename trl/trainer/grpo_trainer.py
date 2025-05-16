@@ -839,6 +839,7 @@ class GRPOTrainer(Trainer):
             torch.cuda.empty_cache()
 
         # ── Scalar loss for HF Trainer bookkeeping ──────────────────────────
+        raise
         if not total_prompt_losses:
             scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
         else:
@@ -1044,9 +1045,22 @@ class GRPOTrainer(Trainer):
         if self.beta != 0.0:
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
-        # print(per_token_loss)
-        # print(completion_mask)
-        # print(loss)
+
+        print('prompt')
+        print(self.tokenizer.decode(prompt_ids))
+        print('completion')
+
+        print(self.tokenizer.decode(completion_ids))
+
+        print('advantages')
+        print(advantages)
+        print('per_token_loss')
+        print(per_token_loss)
+        print('loss')
+
+        print(loss)
+
+
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_logps
         torch.cuda.empty_cache()
         # Log the metrics

@@ -103,6 +103,7 @@ class TreeNode:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            'answer': self.answer if hasattr(self, 'answer') else None,
             "prompt_ids": self.prompt_ids,
             "completion_ids": self.completion_ids,
             "prompt_text": self.prompt_text,
@@ -112,6 +113,7 @@ class TreeNode:
             "rewards": self.rewards,
             "depth": self.depth,
             "children": [c.to_dict() for c in self.children],
+
         }
 
 
@@ -185,6 +187,7 @@ class TreeOfThoughtsEntropyVLLM:
         for n in self._all_nodes(root):
             if n.state is not NodeState.TERMINAL:
                 n.reward = n.compute_final_reward()
+        root.answer = answer
         SAVE_DIR.joinpath(f"{time.time()}.json").write_text(json.dumps(root.to_dict(), indent=2))
         return root
 
