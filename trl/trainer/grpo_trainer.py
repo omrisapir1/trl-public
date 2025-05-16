@@ -816,6 +816,7 @@ class GRPOTrainer(Trainer):
                 with self.compute_loss_context_manager():
                     try:
                         loss = self._compute_loss_for_group(model, group)
+
                     except RuntimeError as err:
                         # OOM / NaNs – skip this group, free memory
                         print("[GRPO] Skipping group due to error:", err)
@@ -838,7 +839,9 @@ class GRPOTrainer(Trainer):
             del prompt_losses
             torch.cuda.empty_cache()
 
-        # ── Scalar loss for HF Trainer bookkeeping ──────────────────────────
+        for name, p in model.named_parameters():
+            if p.grad is not None:
+                print(name, p.grad.abs().mean().item())
         raise
         if not total_prompt_losses:
             scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
@@ -1046,19 +1049,16 @@ class GRPOTrainer(Trainer):
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
 
-        print('prompt')
-        print(self.tokenizer.decode(prompt_ids))
-        print('completion')
+        for row_idx in range(prompt_ids.size(0)):
+            print("▸ prompt", row_idx)
+            print(self.tokenizer.decode(prompt_ids[row_idx]))
+            print("▸ completion")
+            print(self.tokenizer.decode(completion_ids[row_idx][completion_mask[row_idx].bool()]))
 
-        print(self.tokenizer.decode(completion_ids))
-
-        print('advantages')
-        print(advantages)
-        print('per_token_loss')
-        print(per_token_loss)
-        print('loss')
-
-        print(loss)
+            print("advantage:", float(advantages[row_idx]))
+            print("per-token loss (first 5):", per_token_loss[row_idx][:5].tolist())
+        print("adv mean/var:", advantages.mean().item(), advantages.var(unbiased=False).item())
+        print("total loss:", loss.item(), "mean per-token:", per_token_loss.mean().item())
 
 
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_logps
