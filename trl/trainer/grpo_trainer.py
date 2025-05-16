@@ -827,6 +827,8 @@ class GRPOTrainer(Trainer):
                     # scale so backward accumulates prompt‑mean
                     scaled_loss = loss / len(group_list)
                     self.accelerator.backward(scaled_loss)
+                    total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1e9)
+                    print("grad-norm", total_norm.item())
                     prompt_losses.append(loss.detach())  # for stats only
 
                 # free ASAP
@@ -839,10 +841,7 @@ class GRPOTrainer(Trainer):
             del prompt_losses
             torch.cuda.empty_cache()
 
-        for name, p in model.named_parameters():
-            if p.grad is not None:
-                print(name, p.grad.abs().mean().item())
-        raise
+
         if not total_prompt_losses:
             scalar_loss = torch.zeros(1, device=self.accelerator.device, requires_grad=False)
         else:
@@ -1049,16 +1048,16 @@ class GRPOTrainer(Trainer):
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
 
-        for row_idx in range(prompt_ids.size(0)):
-            print("▸ prompt", row_idx)
-            print(self.tokenizer.decode(prompt_ids[row_idx]))
-            print("▸ completion")
-            print(self.tokenizer.decode(completion_ids[row_idx][completion_mask[row_idx].bool()]))
-
-            print("advantage:", float(advantages[row_idx]))
-            print("per-token loss (first 5):", per_token_loss[row_idx][:5].tolist())
-        print("adv mean/var:", advantages.mean().item(), advantages.var(unbiased=False).item())
-        print("total loss:", loss.item(), "mean per-token:", per_token_loss.mean().item())
+        # for row_idx in range(prompt_ids.size(0)):
+        #     print("▸ prompt", row_idx)
+        #     print(self.tokenizer.decode(prompt_ids[row_idx]))
+        #     print("▸ completion")
+        #     print(self.tokenizer.decode(completion_ids[row_idx][completion_mask[row_idx].bool()]))
+        #
+        #     print("advantage:", float(advantages[row_idx]))
+        #     print("per-token loss (first 5):", per_token_loss[row_idx][:5].tolist())
+        # print("adv mean/var:", advantages.mean().item(), advantages.var(unbiased=False).item())
+        # print("total loss:", loss.item(), "mean per-token:", per_token_loss.mean().item())
 
 
         del per_token_loss, per_token_loss2, per_token_loss1, completion_mask, advantages, coef_2, coef_1, per_token_logps
