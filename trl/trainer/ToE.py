@@ -237,7 +237,7 @@ class TreeOfThoughtsEntropyVLLM:
 
 
                 if (
-                        len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H < TAU
+                        len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
                         and at_splitable_token and not out.text[-1] in SPLITABLE_TOKENS
                         # self.cur_split_count < MAX_TOTAL_SPLITS
                 ) or (node.depth==0):
