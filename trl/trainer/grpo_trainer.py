@@ -826,7 +826,14 @@ class GRPOTrainer(Trainer):
                 if loss is not None and loss.requires_grad:
                     # scale so backward accumulates prompt‑mean
                     scaled_loss = loss / len(group_list)
-                    self.accelerator.backward(scaled_loss)
+                    try:
+                        self.accelerator.backward(scaled_loss)
+                    except:
+                        print('OOM')
+                        del group, loss
+                        torch.cuda.empty_cache()
+                        continue
+
 
                     prompt_losses.append(loss.detach())  # for stats only
 
