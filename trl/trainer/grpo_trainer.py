@@ -893,10 +893,10 @@ class GRPOTrainer(Trainer):
           (loss / backward) already loops over *every* group dict, so no other
           change is required.
         """
-        print('not moved!')
+
 
         if self.state.global_step != self._last_loaded_step:
-            print('moved!')
+
             self._move_model_to_vllm()
             self._last_loaded_step = self.state.global_step
 
