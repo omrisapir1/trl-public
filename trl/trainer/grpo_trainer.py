@@ -827,7 +827,7 @@ class GRPOTrainer(Trainer):
                     # scale so backward accumulates prompt‑mean
                     scaled_loss = loss / len(group_list)
                     self.accelerator.backward(scaled_loss)
-                    
+
                     prompt_losses.append(loss.detach())  # for stats only
 
                 # free ASAP
