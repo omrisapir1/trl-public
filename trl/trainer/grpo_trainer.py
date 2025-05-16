@@ -1039,7 +1039,7 @@ class GRPOTrainer(Trainer):
         print('----- advantages ----')
         print(advantages)
         print('----- per_token_advantages ----')
-        token_lens = completion_mask.sum(dim=1).clamp(min=1)
+        token_lens = completion_mask.sum(dim=1).clamp(min=1).to(model.device)
 
         tok_adv = advantages.unsqueeze(1) / token_lens.unsqueeze(1)
         print(tok_adv)
