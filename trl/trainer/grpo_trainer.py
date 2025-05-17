@@ -521,7 +521,7 @@ class GRPOTrainer(Trainer):
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
-                                gpu_memory_utilization=0.35,
+                                gpu_memory_utilization=0.3,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=128,
                                 disable_log_stats=True,
@@ -822,7 +822,7 @@ class GRPOTrainer(Trainer):
 
                         print("[GRPO] Skipping group due to error:", err)
                         torch.cuda.empty_cache()
-                        continue
+                        break
 
                 if loss is not None and loss.requires_grad:
                     # scale so backward accumulates prompt‑mean
