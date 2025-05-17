@@ -793,6 +793,7 @@ class GRPOTrainer(Trainer):
         """
 
         import gc  # local import avoids top‑level pollution
+        max_grad = getattr(self.args, "max_grad_norm", 1.0)  # clip value
 
         model.train()
         if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
@@ -811,7 +812,7 @@ class GRPOTrainer(Trainer):
                 continue
 
             prompt_losses: list[torch.Tensor] = []
-
+            gc.collect()
             for group in group_list:
                 with self.compute_loss_context_manager():
                     try:
@@ -841,6 +842,15 @@ class GRPOTrainer(Trainer):
                 # free ASAP
                 del group, loss
                 torch.cuda.empty_cache()
+
+            total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad, error_if_nonfinite=False)
+            if not torch.isfinite(total_norm):
+                if self.accelerator.is_main_process:
+                    print(f"[GRPO] ⚠️  non‑finite grad (norm={total_norm}); "
+                          "skipping this optimisation step.")
+                self.optimizer.zero_grad(set_to_none=True)
+                # return a dummy (detached) scalar so trainer keeps running
+                return torch.zeros(1, device=self.accelerator.device)
 
             if prompt_losses:
                 total_prompt_losses.append(torch.stack(prompt_losses).mean())
@@ -1058,12 +1068,16 @@ class GRPOTrainer(Trainer):
         # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
         # _generate_and_score_completions) and use per_token_logps.detach() instead.
         old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
-        coef_1 = torch.exp(per_token_logps - old_per_token_logps)
+        log_ratio = (per_token_logps - old_per_token_logps).clamp(-60, 60)
+        coef_1 = torch.exp(log_ratio)
+        # coef_1 = torch.exp(per_token_logps - old_per_token_logps)
         coef_2 = torch.clamp(coef_1, 1 - self.epsilon_low, 1 + self.epsilon_high)
         per_token_loss1 = coef_1 * advantages.unsqueeze(1)
         per_token_loss2 = coef_2 * advantages.unsqueeze(1)
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if self.beta != 0.0:
+            diff = (ref_per_token_logps - per_token_logps).clamp(-60, 60)
+            per_token_kl = torch.exp(diff) - diff - 1
             per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask.to(model.device)).sum() / completion_mask.sum().to(model.device)
 
