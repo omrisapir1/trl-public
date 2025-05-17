@@ -833,7 +833,7 @@ class GRPOTrainer(Trainer):
                         print('OOM')
                         del group, loss
                         torch.cuda.empty_cache()
-                        continue
+                        break
 
 
                     prompt_losses.append(loss.detach())  # for stats only
