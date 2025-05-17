@@ -1005,7 +1005,7 @@ class GRPOTrainer(Trainer):
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         dtype_counts = Counter(param.dtype for param in model.parameters())
         try:
-            chunk_threshold = 2000  # total elements threshold
+            chunk_threshold = 1200  # total elements threshold
 
             total_elements = input_ids.shape[0] * input_ids.shape[1]
             if total_elements > chunk_threshold:
@@ -1029,6 +1029,8 @@ class GRPOTrainer(Trainer):
                 print(self.tokenizer.decode(inpt))
             print(input_ids.shape)
             print(attention_mask)
+            del input_ids, attention_mask
+            torch.cuda.empty_cache()
             raise
 
         # Compute the KL divergence between the model and the reference model
