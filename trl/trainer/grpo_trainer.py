@@ -1071,7 +1071,6 @@ class GRPOTrainer(Trainer):
         per_token_loss2 = coef_2 * advantages.unsqueeze(1)
         per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
         if self.beta != 0.0:
-            print(self.beta)
             ref_per_token_logps = inputs["ref_per_token_logps"].to(model.device)
             diff = (ref_per_token_logps - per_token_logps).clamp(-60, 60)
             per_token_kl = torch.exp(diff) - diff - 1
