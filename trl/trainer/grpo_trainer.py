@@ -635,7 +635,7 @@ class GRPOTrainer(Trainer):
                 continue_final_message=False,
             )
 
-        df = pd.read_csv('Qwq_32b_awq_greedy_200_test.csv')
+        df = pd.read_csv('/workspace/Qwq_32b_awq_greedy_200_test.csv')
         prompt_list = df['problem'].apply(_prompt).tolist()
         res = asyncio.run(self.pred_prompts(prompt_list))
         df['text_prediction'] = res
