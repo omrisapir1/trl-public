@@ -1,4 +1,10 @@
 import os
+
+from vllm import SamplingParams
+try:
+    from .extract_answer import extract_final_answer, math_equal
+except:
+    from extract_answer import extract_final_answer, math_equal
 os.environ["VLLM_USE_V1"] = "0"
 # Copyright 2025 The HuggingFace Team. All rights reserved.
 #
@@ -526,9 +532,6 @@ class GRPOTrainer(Trainer):
                                 max_num_seqs=128,
                                 disable_log_stats=True,
 
-
-
-
                                 max_num_batched_tokens=64 * 1500,
                                 # trust_remote_code=True,
 
@@ -540,6 +543,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
+                self.log_results_200()
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -596,6 +600,50 @@ class GRPOTrainer(Trainer):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
         # self.ref_model = self.ref_model.to('cuda:1')
         # self.accelerator.device = 'cuda:0'
+
+    async def run_one(self, prompt: str, request_id: str) -> str:
+        # set whatever decoding you like
+        params = SamplingParams(max_tokens=5000, temperature=0.0, skip_special_tokens=False)
+
+        # engine.generate is an async generator that yields incremental RequestOutput
+        async for out in self.vllm_client.generate(prompt, params, request_id):
+            if out.finished:  # last chunk for this request
+                return out.outputs[0].text  # the full completion
+        # Fallback (shouldn’t be reached)
+        return ""
+
+    # ── 3. Kick off all requests in parallel ───────────────────────────────────────
+    async def pred_prompts(self, prompts_list):
+
+        tasks = [
+            asyncio.create_task(self.run_one(p, f"req-{i}"))
+            for i, p in enumerate(prompts_list)
+        ]
+        results = await asyncio.gather(*tasks)
+
+        self.vllm_client.shutdown_background_loop()
+        return results
+
+
+    def log_results_200(self):
+        import pandas as pd
+        def _prompt(problem: str):
+            return self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": problem}],
+                tokenize=False,
+                add_generation_prompt=True,
+                continue_final_message=False,
+            )
+
+        df = pd.read_csv('Qwq_32b_awq_greedy_200_test.csv')
+        prompt_list = df['problem'].apply(_prompt).tolist()
+        res = asyncio.run(self.pred_prompts(prompt_list))
+        df['text_prediction'] = res
+        df['numerical_pred'] = df['text_prediction'].apply(extract_final_answer)
+        accuracy = df.apply(lambda r: math_equal(r['numerical_solution'], r['numerical_pred']), axis=1).mean()
+        tokens_length_avg =df['text_prediction'].apply(self.tokenizer.encode).apply(len).mean()
+        print(f'accuracy is {accuracy} tokens_length_avg {tokens_length_avg}')
+
 
     def _set_signature_columns_if_needed(self):
         # If `self.args.remove_unused_columns` is True, non-signature columns are removed.
@@ -773,6 +821,53 @@ class GRPOTrainer(Trainer):
     #     # Reset cache on main process
     #     if self.accelerator.is_main_process:
     #         self.vllm_client.reset_prefix_cache()
+    def _save_checkpoint(self, model, trial):
+        # In all cases, including ddp/dp/deepspeed, self.model is always a reference to the model we
+        # want to save except FullyShardedDDP.
+        # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
+
+        # Save model checkpoint
+        checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+
+        if self.hp_search_backend is None and trial is None:
+            self.store_flos()
+
+        run_dir = self._get_output_dir(trial=trial)
+        output_dir = os.path.join(run_dir, checkpoint_folder)
+        self.save_model(output_dir, _internal_call=True)
+
+        self.log_results_200()
+
+        if not self.args.save_only_model:
+            # Save optimizer and scheduler
+            self._save_optimizer_and_scheduler(output_dir)
+            self._save_scaler(output_dir)
+            # Save RNG state
+            self._save_rng_state(output_dir)
+
+        # Save the Trainer state
+        if self.args.should_save:
+            # Update `ExportableState` callbacks and `TrainerControl` state to where we are currently
+            for cb in [
+                cb for cb in self.callback_handler.callbacks + [self.control] if isinstance(cb, ExportableState)
+            ]:
+                cb_name = cb.__class__.__name__
+                cb_state = cb.state()
+                if isinstance(self.state.stateful_callbacks[cb_name], list):
+                    self.state.stateful_callbacks[cb_name].append(cb_state)
+                else:
+                    self.state.stateful_callbacks[cb_name] = cb_state
+            self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
+
+        if self.args.push_to_hub:
+            self._push_from_checkpoint(output_dir)
+
+        # Maybe delete some older checkpoints.
+        if self.args.should_save:
+            # Solely rely on numerical checkpoint id for rotation.
+            # mtime is not reliable especially on some fuse fs in cloud environments.
+            self._rotate_checkpoints(use_mtime=False, output_dir=run_dir)
+
 
     def training_step(
             self,
