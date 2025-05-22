@@ -814,7 +814,7 @@ class GRPOTrainer(Trainer):
 
         for i in range(100):
             print(f'self.control.should_save {self.control.should_save}')
-        time.sleep(100)
+        time.sleep(10)
         if self.control.should_save:
             self.log_results_200()
             self._save_checkpoint(model, trial)
