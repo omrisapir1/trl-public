@@ -626,6 +626,7 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self):
+        return 
         import pandas as pd
         def _prompt(problem: str):
             return self.tokenizer.apply_chat_template(
@@ -822,7 +823,7 @@ class GRPOTrainer(Trainer):
     #     if self.accelerator.is_main_process:
     #         self.vllm_client.reset_prefix_cache()
 
-    
+
     def training_step(
             self,
             model: nn.Module,
