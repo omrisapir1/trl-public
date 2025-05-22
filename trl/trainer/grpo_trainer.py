@@ -1,4 +1,6 @@
+import json
 import os
+import time
 
 from vllm import SamplingParams
 try:
@@ -642,7 +644,9 @@ class GRPOTrainer(Trainer):
         df['numerical_pred'] = df['text_prediction'].apply(extract_final_answer)
         accuracy = df.apply(lambda r: math_equal(r['numerical_solution'], r['numerical_pred']), axis=1).mean()
         tokens_length_avg =df['text_prediction'].apply(self.tokenizer.encode).apply(len).mean()
-        print(f'accuracy is {accuracy} tokens_length_avg {tokens_length_avg}')
+        final_res = {'accuracy': accuracy, 'tokens_length_avg': tokens_length_avg}
+        json.dump(final_res,open(f'/workspace/{time.time()}.json', 'w'))
+
 
 
     def _set_signature_columns_if_needed(self):

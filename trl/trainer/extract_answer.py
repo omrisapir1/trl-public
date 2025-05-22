@@ -8,13 +8,8 @@ from sympy.parsing.sympy_parser import parse_expr
 from sympy.parsing.latex import parse_latex
 # Note: latex2sympy2 is a specific dependency mentioned in math_utils.py
 # and used in grader.py's symbolic_equal._parse
-try:
-    from latex2sympy2 import latex2sympy
-except ImportError:
-    print("Warning: latex2sympy2 not installed. Symbolic comparison might be less robust.")
-    # Define a dummy function if not available
-    def latex2sympy(x):
-        raise NotImplementedError("latex2sympy2 is required")
+
+from latex2sympy2 import latex2sympy
 
 # ---------------------------------------------------------------------------
 # Simplified Answer Extraction (Normally from parser.py -> extract_answer)
