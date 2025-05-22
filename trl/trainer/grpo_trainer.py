@@ -788,6 +788,8 @@ class GRPOTrainer(Trainer):
     def _maybe_log_save_evaluate(
         self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time, learning_rate=None
     ):
+        print('did log')
+        raise
         if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
             logs: dict[str, float] = {}
 
