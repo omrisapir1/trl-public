@@ -788,7 +788,7 @@ class GRPOTrainer(Trainer):
     def _maybe_log_save_evaluate(
         self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time, learning_rate=None
     ):
-        print('did log')
+
         if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
             logs: dict[str, float] = {}
 
@@ -812,8 +812,8 @@ class GRPOTrainer(Trainer):
 
             self.log(logs, start_time)
 
-
-        print(f'self.control.should_save {self.control.should_save}')
+        for i in range(100):
+            print(f'self.control.should_save {self.control.should_save}')
         time.sleep(100)
         if self.control.should_save:
             self.log_results_200()
