@@ -626,7 +626,6 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self):
-        return 
         import pandas as pd
         def _prompt(problem: str):
             return self.tokenizer.apply_chat_template(
@@ -822,6 +821,38 @@ class GRPOTrainer(Trainer):
     #     # Reset cache on main process
     #     if self.accelerator.is_main_process:
     #         self.vllm_client.reset_prefix_cache()
+    def _maybe_log_save_evaluate(
+        self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time, learning_rate=None
+    ):
+        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
+            logs: dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            if grad_norm is not None:
+                logs["grad_norm"] = grad_norm.item() if isinstance(grad_norm, torch.Tensor) else grad_norm
+            if learning_rate is not None:
+                logs["learning_rate"] = learning_rate
+            else:
+                logs["learning_rate"] = self._get_learning_rate()
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs, start_time)
+
+
+
+        if self.control.should_save:
+
+            self._save_checkpoint(model, trial)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
 
     def training_step(
