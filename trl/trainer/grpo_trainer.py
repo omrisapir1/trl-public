@@ -545,7 +545,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
-                self.log_results_200(skip_first=False)
+                self.log_results_200(skip_first=True)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -622,8 +622,7 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self, skip_first=False):
-        if skip_first:
-            return {}
+
 
         import pandas as pd, time, json, torch
         from transformers import GenerationConfig
@@ -639,6 +638,8 @@ class GRPOTrainer(Trainer):
 
         # ---------- load test set -------------------------------------------------
         df = pd.read_csv("/workspace/Qwq_32b_awq_greedy_200_test.csv")
+        if skip_first:
+            df = df.iloc[:5]
         prompt_list = df["problem"].apply(_prompt).tolist()
 
         # ---------- 1) vLLM -------------------------------------------------------
