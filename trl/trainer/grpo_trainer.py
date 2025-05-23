@@ -534,7 +534,7 @@ class GRPOTrainer(Trainer):
                                 max_num_seqs=128,
                                 disable_log_stats=True,
 
-                                max_num_batched_tokens=64 * 2500,
+                                max_num_batched_tokens=64 * 3500,
                                 trust_remote_code=True,
 
                                 # tensor_parallel_size=2,
