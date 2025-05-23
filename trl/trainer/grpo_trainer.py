@@ -603,137 +603,100 @@ class GRPOTrainer(Trainer):
         # self.ref_model = self.ref_model.to('cuda:1')
         # self.accelerator.device = 'cuda:0'
 
-    async def run_one(self, prompt: str, request_id: str) -> str:
-        # set whatever decoding you like
-        params = SamplingParams(max_tokens=5000, temperature=0.0, skip_special_tokens=False)
+    aasync def run_one(self, prompt: str, request_id: str) -> str:   # ← async
+    params = SamplingParams(
+        max_tokens=5000,
+        temperature=0.0,
+        skip_special_tokens=False,
+    )
+    async for out in self.vllm_client.generate(prompt, params, request_id):
+        if out.finished:
+            return out.outputs[0].text
+    return ""        # should not reach
 
-        # engine.generate is an async generator that yields incremental RequestOutput
-        async for out in self.vllm_client.generate(prompt, params, request_id):
-            if out.finished:  # last chunk for this request
-                return out.outputs[0].text  # the full completion
-        # Fallback (shouldn’t be reached)
-        return ""
+# ── 2. batch helper ──────────────────────────────────────────────────────────
+async def pred_prompts(self, prompts_list):
+    tasks = [asyncio.create_task(self.run_one(p, f"req-{i}"))
+             for i, p in enumerate(prompts_list)]
+    return await asyncio.gather(*tasks)          #   no shutdown here
 
-    # ── 3. Kick off all requests in parallel ───────────────────────────────────────
-    async def pred_prompts(self, prompts_list):
+# ── 3. evaluation ────────────────────────────────────────────────────────────
+def log_results_200(self, skip_first=False):
+    if skip_first:
+        return {}
 
-        tasks = [
-            asyncio.create_task(self.run_one(p, f"req-{i}"))
-            for i, p in enumerate(prompts_list)
-        ]
-        return await asyncio.gather(*tasks)
+    import pandas as pd, time, json, torch
+    from transformers import GenerationConfig
 
+    # helper to wrap problems in chat template
+    def _prompt(problem: str) -> str:
+        return self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": problem}],
+            tokenize=False,
+            add_generation_prompt=True,
+            continue_final_message=False,
+        )
 
-    def log_results_200(self, skip_first=False):
-        """
-        Evaluate on the fixed 200‑problem test set with:
-          • vLLM (self.vllm_client) – your current fast path
-          • the current in‑memory Transformers model (self.model)
+    # ---------- load test set -------------------------------------------------
+    df = pd.read_csv("/workspace/Qwq_32b_awq_greedy_200_test.csv")
+    prompt_list = df["problem"].apply(_prompt).tolist()
 
-        Saves a JSON file like:
-            {
-              "accuracy_vllm": 0.42,
-              "accuracy_xfmr": 0.40,
-              "tokens_avg_vllm": 37.2,
-              "tokens_avg_xfmr": 37.4
-            }
-        """
-        if skip_first:
-            return {}
-        import pandas as pd
-        # ── helpers ─────────────────────────────────────────────────────────────
-        def _prompt(problem: str) -> str:
-            return self.tokenizer.apply_chat_template(
-                [{"role": "user", "content": problem}],
-                tokenize=False,
-                add_generation_prompt=True,
-                continue_final_message=False,
+    # ---------- 1) vLLM -------------------------------------------------------
+    preds_vllm = asyncio.run(self.pred_prompts(prompt_list))     # ← await it
+    df["pred_vllm"] = preds_vllm
+    df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
+
+    acc_vllm = df.apply(
+        lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
+        axis=1,
+    ).mean()
+    tok_avg_vllm = df["pred_vllm"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
+
+    # ---------- 2) Transformers ----------------------------------------------
+    def _pred_xfmr(prompts, batch_size=16):
+        gen_cfg = GenerationConfig(
+            max_new_tokens=3000,
+            temperature=0.0,
+            do_sample=False,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+        )
+        self.model.eval()
+        device = next(self.model.parameters()).device
+        outs = []
+        for i in range(0, len(prompts), batch_size):
+            batch = prompts[i : i + batch_size]
+            toks = self.tokenizer(batch, return_tensors="pt", padding=True).to(device)
+            with torch.no_grad():
+                gen = self.model.generate(**toks, generation_config=gen_cfg)
+            prompt_len = toks["input_ids"].shape[1]
+            outs.extend(
+                self.tokenizer.batch_decode(gen[:, prompt_len:], skip_special_tokens=False)
             )
+        return outs
 
-        async def _pred_vllm(prompts: list[str]) -> list[str]:
-            tasks = [
-                asyncio.create_task(self.run_one(p, f"eval-{i}"))
-                for i, p in enumerate(prompts)
-            ]
-            out = await asyncio.gather(*tasks)
-            # keep the vLLM background loop alive if you wish, or shut down:
-            # self.vllm_client.shutdown_background_loop()
-            return out
+    preds_xfmr = _pred_xfmr(prompt_list)
+    df["pred_xfmr"] = preds_xfmr
+    df["numerical_pred_xfmr"] = df["pred_xfmr"].apply(extract_final_answer)
 
-        def _pred_xfmr(prompts: list[str], batch_size: int = 16) -> list[str]:
-            """Greedy decode with the *current* self.model (no sampling)."""
+    acc_xfmr = df.apply(
+        lambda r: math_equal(r["numerical_solution"], r["numerical_pred_xfmr"]),
+        axis=1,
+    ).mean()
+    tok_avg_xfmr = df["pred_xfmr"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
 
-            gen_cfg = GenerationConfig(
-                max_new_tokens=3000,
-                temperature=0.0,  # greedy
-                do_sample=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-            )
-            self.model.eval()
-            results = []
-            device = next(self.model.parameters()).device
-            for i in range(0, len(prompts), batch_size):
-                batch = prompts[i: i + batch_size]
-                tok_out = self.tokenizer(batch, return_tensors="pt", padding=True).to(device)
-                with torch.no_grad():
-                    gen = self.model.generate(**tok_out, generation_config=gen_cfg)
-                # slice off the prompt to keep only the completion text
-                prompt_len = tok_out["input_ids"].shape[1]
-                batch_txt = self.tokenizer.batch_decode(
-                    gen[:, prompt_len:], skip_special_tokens=False
-                )
-                results.extend(batch_txt)
-            return results
+    # ---------- save & print --------------------------------------------------
+    res = {
+        "accuracy_vllm": float(acc_vllm),
+        "accuracy_xfmr": float(acc_xfmr),
+        "tokens_avg_vllm": float(tok_avg_vllm),
+        "tokens_avg_xfmr": float(tok_avg_xfmr),
+    }
+    ts = time.time()
+    with open(f"/workspace/eval_{ts:.0f}.json", "w") as f:
+        json.dump(res, f, indent=2)
 
-        # ── load test set & build prompts ──────────────────────────────────────
-        df = pd.read_csv("/workspace/Qwq_32b_awq_greedy_200_test.csv")
-        prompt_list = df["problem"].apply(_prompt).tolist()
-
-        # ── 1) vLLM evaluation ─────────────────────────────────────────────────
-
-        preds_vllm = _pred_vllm(prompt_list)
-        df["pred_vllm"] = preds_vllm
-        df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
-
-        acc_vllm = (
-            df.apply(
-                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
-                axis=1,
-            ).mean()
-        )
-        tok_avg_vllm = (
-            df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
-        )
-
-
-        # ── 2) Transformers‑model evaluation ───────────────────────────────────
-        preds_xfmr = _pred_xfmr(prompt_list)
-        df["pred_xfmr"] = preds_xfmr
-        df["numerical_pred_xfmr"] = df["pred_xfmr"].apply(extract_final_answer)
-
-        acc_xfmr = (
-            df.apply(
-                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_xfmr"]),
-                axis=1,
-            ).mean()
-        )
-        tok_avg_xfmr = (
-            df["pred_xfmr"].apply(self.tokenizer.encode).apply(len).mean()
-        )
-
-        # ── save & print ───────────────────────────────────────────────────────
-        res = {
-            "accuracy_vllm": float(acc_vllm),
-            "accuracy_xfmr": float(acc_xfmr),
-            "tokens_avg_vllm": float(tok_avg_vllm),
-            "tokens_avg_xfmr": float(tok_avg_xfmr),
-        }
-        ts = time.time()
-        with open(f"/workspace/eval_{ts:.0f}.json", "w") as f:
-            json.dump(res, f, indent=2)
-
-        print(f"[eval @ step {self.state.global_step}] {res}")
+    print(f"[eval @ step {self.state.global_step}] {res}")
 
 
 
