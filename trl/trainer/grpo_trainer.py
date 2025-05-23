@@ -621,10 +621,8 @@ class GRPOTrainer(Trainer):
             asyncio.create_task(self.run_one(p, f"req-{i}"))
             for i, p in enumerate(prompts_list)
         ]
-        results = await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks)
 
-        self.vllm_client.shutdown_background_loop()
-        return results
 
     def log_results_200(self, skip_first=False):
         """
@@ -640,6 +638,8 @@ class GRPOTrainer(Trainer):
               "tokens_avg_xfmr": 37.4
             }
         """
+        if skip_first:
+            return {}
         import pandas as pd
         # ── helpers ─────────────────────────────────────────────────────────────
         def _prompt(problem: str) -> str:
@@ -691,23 +691,21 @@ class GRPOTrainer(Trainer):
         prompt_list = df["problem"].apply(_prompt).tolist()
 
         # ── 1) vLLM evaluation ─────────────────────────────────────────────────
-        if not skip_first:
-            preds_vllm = asyncio.run(_pred_vllm(prompt_list))
-            df["pred_vllm"] = preds_vllm
-            df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
 
-            acc_vllm = (
-                df.apply(
-                    lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
-                    axis=1,
-                ).mean()
-            )
-            tok_avg_vllm = (
-                df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
-            )
-        else:
-            tok_avg_vllm = 100
-            acc_vllm = 100
+        preds_vllm = _pred_vllm(prompt_list)
+        df["pred_vllm"] = preds_vllm
+        df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
+
+        acc_vllm = (
+            df.apply(
+                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
+                axis=1,
+            ).mean()
+        )
+        tok_avg_vllm = (
+            df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
+        )
+
 
         # ── 2) Transformers‑model evaluation ───────────────────────────────────
         preds_xfmr = _pred_xfmr(prompt_list)
