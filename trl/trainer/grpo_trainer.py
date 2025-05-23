@@ -352,7 +352,7 @@ class GRPOTrainer(Trainer):
             model_init_kwargs["use_cache"] = (
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
-            model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto', **model_init_kwargs)
+            model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto',trust_remote_code=True, **model_init_kwargs)
             from collections import Counter
 
             # Count dtypes across all parameters
@@ -383,7 +383,7 @@ class GRPOTrainer(Trainer):
             # If beta is 0.0, the reference model is not needed
             self.ref_model = None
         elif is_deepspeed_zero3_enabled():
-            self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
+            self.ref_model = AutoModelForCausalLM.from_pretrained(model_id,torch_dtype='auto',trust_remote_code=True, **model_init_kwargs)
         elif is_peft_model(model):
             # If PEFT is used, the reference model is not needed since the adapter can be disabled
             # to revert to the initial model.
@@ -531,17 +531,18 @@ class GRPOTrainer(Trainer):
                                 # device='cuda:1',
                                 gpu_memory_utilization=0.3,
                                 dtype=torch.bfloat16,
-                                max_num_seqs=128,
+                                max_num_seqs=1,
                                 disable_log_stats=True,
 
                                 max_num_batched_tokens=64 * 1500,
-                                # trust_remote_code=True,
+                                trust_remote_code=True,
 
                                 # tensor_parallel_size=2,
                                 # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
                                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
                                 # This is particularly useful here because we generate completions from the same prompts.
-                                enable_prefix_caching=self.args.vllm_enable_prefix_caching,
+                                enable_prefix_caching=False,
+                                disable_default_stream=True,
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
@@ -626,7 +627,7 @@ class GRPOTrainer(Trainer):
         self.vllm_client.shutdown_background_loop()
         return results
 
-    def log_results_200(self, skip_first):
+    def log_results_200(self, skip_first=False):
         """
         Evaluate on the fixed 200‑problem test set with:
           • vLLM (self.vllm_client) – your current fast path
