@@ -660,7 +660,7 @@ class GRPOTrainer(Trainer):
             # self.vllm_client.shutdown_background_loop()
             return out
 
-        def _pred_xfmr(prompts: list[str], batch_size: int = 64) -> list[str]:
+        def _pred_xfmr(prompts: list[str], batch_size: int = 16) -> list[str]:
             """Greedy decode with the *current* self.model (no sampling)."""
 
             gen_cfg = GenerationConfig(
