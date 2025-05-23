@@ -541,7 +541,7 @@ class GRPOTrainer(Trainer):
                                 # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
                                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
                                 # This is particularly useful here because we generate completions from the same prompts.
-                                enable_prefix_caching=False,
+                                enable_prefix_caching=True,
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
