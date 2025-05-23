@@ -531,7 +531,7 @@ class GRPOTrainer(Trainer):
                                 # device='cuda:1',
                                 gpu_memory_utilization=0.3,
                                 dtype=torch.bfloat16,
-                                max_num_seqs=1,
+                                max_num_seqs=256,
                                 disable_log_stats=True,
 
                                 max_num_batched_tokens=64 * 1500,
