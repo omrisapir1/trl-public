@@ -640,7 +640,7 @@ class GRPOTrainer(Trainer):
               "tokens_avg_xfmr": 37.4
             }
         """
-
+        import pandas as pd
         # ── helpers ─────────────────────────────────────────────────────────────
         def _prompt(problem: str) -> str:
             return self.tokenizer.apply_chat_template(
@@ -662,7 +662,7 @@ class GRPOTrainer(Trainer):
 
         def _pred_xfmr(prompts: list[str], batch_size: int = 8) -> list[str]:
             """Greedy decode with the *current* self.model (no sampling)."""
-            import pandas as pd
+
             gen_cfg = GenerationConfig(
                 max_new_tokens=512,
                 temperature=0.0,  # greedy
