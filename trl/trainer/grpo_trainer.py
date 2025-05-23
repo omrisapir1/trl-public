@@ -545,7 +545,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
-                self.log_results_200()
+                self.log_results_200(skip_first=True)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -626,7 +626,7 @@ class GRPOTrainer(Trainer):
         self.vllm_client.shutdown_background_loop()
         return results
 
-    def log_results_200(self):
+    def log_results_200(self, skip_first):
         """
         Evaluate on the fixed 200‑problem test set with:
           • vLLM (self.vllm_client) – your current fast path
@@ -691,19 +691,23 @@ class GRPOTrainer(Trainer):
         prompt_list = df["problem"].apply(_prompt).tolist()
 
         # ── 1) vLLM evaluation ─────────────────────────────────────────────────
-        preds_vllm = asyncio.run(_pred_vllm(prompt_list))
-        df["pred_vllm"] = preds_vllm
-        df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
+        if not skip_first:
+            preds_vllm = asyncio.run(_pred_vllm(prompt_list))
+            df["pred_vllm"] = preds_vllm
+            df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
 
-        acc_vllm = (
-            df.apply(
-                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
-                axis=1,
-            ).mean()
-        )
-        tok_avg_vllm = (
-            df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
-        )
+            acc_vllm = (
+                df.apply(
+                    lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
+                    axis=1,
+                ).mean()
+            )
+            tok_avg_vllm = (
+                df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
+            )
+        else:
+            tok_avg_vllm = 100
+            acc_vllm = 100
 
         # ── 2) Transformers‑model evaluation ───────────────────────────────────
         preds_xfmr = _pred_xfmr(prompt_list)
