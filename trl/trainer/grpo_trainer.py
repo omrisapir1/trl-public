@@ -664,7 +664,7 @@ class GRPOTrainer(Trainer):
             """Greedy decode with the *current* self.model (no sampling)."""
 
             gen_cfg = GenerationConfig(
-                max_new_tokens=512,
+                max_new_tokens=3000,
                 temperature=0.0,  # greedy
                 do_sample=False,
                 pad_token_id=self.tokenizer.pad_token_id,
