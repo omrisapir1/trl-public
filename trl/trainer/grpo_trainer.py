@@ -545,7 +545,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
-                # self.log_results_200()
+                self.log_results_200()
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -626,10 +626,23 @@ class GRPOTrainer(Trainer):
         self.vllm_client.shutdown_background_loop()
         return results
 
-
     def log_results_200(self):
-        import pandas as pd
-        def _prompt(problem: str):
+        """
+        Evaluate on the fixed 200‑problem test set with:
+          • vLLM (self.vllm_client) – your current fast path
+          • the current in‑memory Transformers model (self.model)
+
+        Saves a JSON file like:
+            {
+              "accuracy_vllm": 0.42,
+              "accuracy_xfmr": 0.40,
+              "tokens_avg_vllm": 37.2,
+              "tokens_avg_xfmr": 37.4
+            }
+        """
+
+        # ── helpers ─────────────────────────────────────────────────────────────
+        def _prompt(problem: str) -> str:
             return self.tokenizer.apply_chat_template(
                 [{"role": "user", "content": problem}],
                 tokenize=False,
@@ -637,15 +650,88 @@ class GRPOTrainer(Trainer):
                 continue_final_message=False,
             )
 
-        df = pd.read_csv('/workspace/Qwq_32b_awq_greedy_200_test.csv')
-        prompt_list = df['problem'].apply(_prompt).tolist()
-        res = asyncio.run(self.pred_prompts(prompt_list))
-        df['text_prediction'] = res
-        df['numerical_pred'] = df['text_prediction'].apply(extract_final_answer)
-        accuracy = df.apply(lambda r: math_equal(r['numerical_solution'], r['numerical_pred']), axis=1).mean()
-        tokens_length_avg =df['text_prediction'].apply(self.tokenizer.encode).apply(len).mean()
-        final_res = {'accuracy': accuracy, 'tokens_length_avg': tokens_length_avg}
-        json.dump(final_res,open(f'/workspace/{time.time()}.json', 'w'))
+        async def _pred_vllm(prompts: list[str]) -> list[str]:
+            tasks = [
+                asyncio.create_task(self.run_one(p, f"eval-{i}"))
+                for i, p in enumerate(prompts)
+            ]
+            out = await asyncio.gather(*tasks)
+            # keep the vLLM background loop alive if you wish, or shut down:
+            # self.vllm_client.shutdown_background_loop()
+            return out
+
+        def _pred_xfmr(prompts: list[str], batch_size: int = 8) -> list[str]:
+            """Greedy decode with the *current* self.model (no sampling)."""
+            import pandas as pd
+            gen_cfg = GenerationConfig(
+                max_new_tokens=512,
+                temperature=0.0,  # greedy
+                do_sample=False,
+                pad_token_id=self.tokenizer.pad_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+            )
+            self.model.eval()
+            results = []
+            device = next(self.model.parameters()).device
+            for i in range(0, len(prompts), batch_size):
+                batch = prompts[i: i + batch_size]
+                tok_out = self.tokenizer(batch, return_tensors="pt", padding=True).to(device)
+                with torch.no_grad():
+                    gen = self.model.generate(**tok_out, generation_config=gen_cfg)
+                # slice off the prompt to keep only the completion text
+                prompt_len = tok_out["input_ids"].shape[1]
+                batch_txt = self.tokenizer.batch_decode(
+                    gen[:, prompt_len:], skip_special_tokens=False
+                )
+                results.extend(batch_txt)
+            return results
+
+        # ── load test set & build prompts ──────────────────────────────────────
+        df = pd.read_csv("/workspace/Qwq_32b_awq_greedy_200_test.csv")
+        prompt_list = df["problem"].apply(_prompt).tolist()
+
+        # ── 1) vLLM evaluation ─────────────────────────────────────────────────
+        preds_vllm = asyncio.run(_pred_vllm(prompt_list))
+        df["pred_vllm"] = preds_vllm
+        df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
+
+        acc_vllm = (
+            df.apply(
+                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
+                axis=1,
+            ).mean()
+        )
+        tok_avg_vllm = (
+            df["pred_vllm"].apply(self.tokenizer.encode).apply(len).mean()
+        )
+
+        # ── 2) Transformers‑model evaluation ───────────────────────────────────
+        preds_xfmr = _pred_xfmr(prompt_list)
+        df["pred_xfmr"] = preds_xfmr
+        df["numerical_pred_xfmr"] = df["pred_xfmr"].apply(extract_final_answer)
+
+        acc_xfmr = (
+            df.apply(
+                lambda r: math_equal(r["numerical_solution"], r["numerical_pred_xfmr"]),
+                axis=1,
+            ).mean()
+        )
+        tok_avg_xfmr = (
+            df["pred_xfmr"].apply(self.tokenizer.encode).apply(len).mean()
+        )
+
+        # ── save & print ───────────────────────────────────────────────────────
+        res = {
+            "accuracy_vllm": float(acc_vllm),
+            "accuracy_xfmr": float(acc_xfmr),
+            "tokens_avg_vllm": float(tok_avg_vllm),
+            "tokens_avg_xfmr": float(tok_avg_xfmr),
+        }
+        ts = time.time()
+        with open(f"/workspace/eval_{ts:.0f}.json", "w") as f:
+            json.dump(res, f, indent=2)
+
+        print(f"[eval @ step {self.state.global_step}] {res}")
 
 
 

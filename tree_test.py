@@ -25,3 +25,5 @@ trainer = GRPOTrainer(
 )
 trainer.train()
 
+trainer.log_results_200()
+trainer.save_model('test/save')
