@@ -16,15 +16,15 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 1.0  # threshold on EMA entropy
+TAU = 0.1#1#0.6  # threshold on EMA entropy
 # TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
 TEMP = 0.6
 TOP_P = 0.85
 TOP_K = 20
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
-MAX_TOKENS = 1000
-MIN_SPLIT_TOKENS = 80
+MAX_TOKENS = 1300
+MIN_SPLIT_TOKENS = 60
 LAST_SPLIT_MIN_CHARS = 150
 
 
@@ -189,7 +189,6 @@ class TreeOfThoughtsEntropyVLLM:
                 n.reward = n.compute_final_reward()
         root.answer = answer
         SAVE_DIR.joinpath(f"{time.time()}.json").write_text(json.dumps(root.to_dict(), indent=2))
-        # self.engine.shutdown_background_loop()
         return root
 
     # ---------------------------------------------------------------- spawn ---
