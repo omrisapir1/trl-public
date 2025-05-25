@@ -622,8 +622,7 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self, skip_first=False):
-        if skip_first:
-            return
+
 
         import pandas as pd, time, json, torch
         from transformers import GenerationConfig
@@ -651,6 +650,10 @@ class GRPOTrainer(Trainer):
             axis=1,
         ).mean()
         tok_avg_vllm = df["pred_vllm"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
+
+        if skip_first:
+            print(acc_vllm, tok_avg_vllm)
+            return
 
         # ---------- 2) Transformers ----------------------------------------------
         def _pred_xfmr(prompts, batch_size=16):
