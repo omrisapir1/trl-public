@@ -864,7 +864,10 @@ class GRPOTrainer(Trainer):
             self.log(logs, start_time)
 
         if self.control.should_save:
-            self.log_results_200()
+            try:
+                self.log_results_200()
+            except:
+                pass
             self._save_checkpoint(model, trial)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
