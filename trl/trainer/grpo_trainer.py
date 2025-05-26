@@ -622,7 +622,8 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self, skip_first=False):
-
+        if skip_first:
+            return 
 
         import pandas as pd, time, json, torch
         from transformers import GenerationConfig
