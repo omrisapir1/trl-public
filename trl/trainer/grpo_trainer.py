@@ -871,6 +871,7 @@ class GRPOTrainer(Trainer):
                 self.log_results_200()
             except:
                 pass
+            torch.save(model.state_dict(), f"/workspace/{time.time()}_state_dict.pth")
             self._save_checkpoint(model, trial)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
