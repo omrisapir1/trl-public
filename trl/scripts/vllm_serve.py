@@ -494,12 +494,11 @@ def main(script_args: ScriptArguments):
         logprob_nested = []  # will stay empty if not requested
 
         for result in all_outputs:  # result == List[GenerationOutput]
-            for out in result.outputs:  # out == GenerationOutput
+            for out in result.outputs:
                 completion_ids.append(list(out.token_ids))
-
                 if request.logprobs:
                     token_lp = [
-                        {tid: lp for tid, lp in step.items()}  # cast OrderedDict to plain dict
+                        {tid: lp.logprob for tid, lp in step.items()}  # convert here
                         for step in out.logprobs
                     ]
                     logprob_nested.append(token_lp)

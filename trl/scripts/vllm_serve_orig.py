@@ -359,7 +359,7 @@ def main(script_args: ScriptArguments):
         if request.logprobs:
             lp_nested = [
                 [  # one completion
-                    {tid: lp for tid, lp in step.items()}
+                    {tid: lp.logprob for tid, lp in step.items()}
                     for step in output.logprobs
                 ]
                 for outputs in all_outputs
