@@ -494,14 +494,15 @@ def main(script_args: ScriptArguments):
         logprob_nested = []  # will stay empty if not requested
 
         for result in all_outputs:  # result == List[GenerationOutput]
-            for out in result.outputs:
+            for out in result.outputs:  # one *completion*
                 completion_ids.append(list(out.token_ids))
+
                 if request.logprobs:
                     token_lp = [
-                        {tid: lp.logprob for tid, lp in step.items()}  # convert here
+                        {tid: lp.logprob for tid, lp in step.items()}
                         for step in out.logprobs
                     ]
-                    logprob_nested.append(token_lp)
+                    logprob_nested.append([token_lp])  # ← wrap in list!
 
         response_payload = {"completion_ids": completion_ids}
         if request.logprobs:
