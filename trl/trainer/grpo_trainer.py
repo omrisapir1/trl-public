@@ -525,7 +525,7 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.vllm_client = VLLMClient(base_url = f"http://0.0.0.0:8000", connection_timeout=60)
+                self.vllm_client = VLLMClient()
                 # pass
                 # self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
                 #                 model=model.name_or_path,
