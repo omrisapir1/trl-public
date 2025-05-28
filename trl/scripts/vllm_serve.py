@@ -415,9 +415,12 @@ def main(script_args: ScriptArguments):
         min_p: float = 0.0
         max_tokens: int = 16
         guided_decoding_regex: Optional[str] = None
+        logprobs: bool = True  # “include logprobs in response?”
+        top_logprobs: int = 20  # how many alternatives (0-20)
 
     class GenerateResponse(BaseModel):
         completion_ids: list[list[int]]
+        logprobs: Optional[list[list[list[dict[int, float]]]]] = None
 
     @app.post("/generate/", response_model=GenerateResponse)
     async def generate(request: GenerateRequest):
@@ -459,7 +462,9 @@ def main(script_args: ScriptArguments):
             min_p=request.min_p,
             max_tokens=request.max_tokens,
             guided_decoding=guided_decoding,
+            logprobs=request.top_logprobs if request.logprobs else 0,  # ← NEW
         )
+
         # Evenly distribute prompts across DP ranks
         chunked_prompts = chunk_list(request.prompts, script_args.data_parallel_size)
 
@@ -474,6 +479,9 @@ def main(script_args: ScriptArguments):
             connection.send({"type": "call", "method": "generate", "kwargs": kwargs})
 
         # Receive results
+
+
+
         all_outputs = [connection.recv() for connection in connections]
 
         # Handle empty prompts (see above)
@@ -481,8 +489,25 @@ def main(script_args: ScriptArguments):
 
         # Flatten and combine all results
         all_outputs = list(chain.from_iterable(all_outputs))  # from list of list to single list
-        completion_ids = [list(output.token_ids) for outputs in all_outputs for output in outputs.outputs]
-        return {"completion_ids": completion_ids}
+        completion_ids = []
+        logprob_nested = []  # will stay empty if not requested
+
+        for result in all_outputs:  # result == List[GenerationOutput]
+            for out in result.outputs:  # out == GenerationOutput
+                completion_ids.append(list(out.token_ids))
+
+                if request.logprobs:
+                    token_lp = [
+                        {tid: lp for tid, lp in step.items()}  # cast OrderedDict to plain dict
+                        for step in out.logprobs
+                    ]
+                    logprob_nested.append(token_lp)
+
+        response_payload = {"completion_ids": completion_ids}
+        if request.logprobs:
+            response_payload["logprobs"] = logprob_nested
+
+        return response_payload
 
     class InitCommunicatorRequest(BaseModel):
         host: str
