@@ -61,6 +61,7 @@ logger = logging.getLogger(__name__)
 # We use CUDA with multiprocessing, so we must use the 'spawn' start method. Otherwise, we will get the following
 # error: RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use
 # the 'spawn' start method
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 
 
