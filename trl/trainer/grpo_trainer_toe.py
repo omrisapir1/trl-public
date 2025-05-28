@@ -8,7 +8,7 @@ try:
     from .extract_answer import extract_final_answer, math_equal
 except:
     from extract_answer import extract_final_answer, math_equal
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["VLLM_USE_V1"] = "0"
 # Copyright 2025 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,7 +55,7 @@ from transformers.utils import is_peft_available
 
 from ..data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
 from ..extras.profiling import profiling_context, profiling_decorator
-from ..extras.vllm_client import VLLMClient
+# from ..extras.vllm_client import VLLMClient
 # from vllm import LLM
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
@@ -525,28 +525,27 @@ class GRPOTrainer(Trainer):
                 )
 
             if self.accelerator.is_main_process:
-                self.vllm_client = VLLMClient(base_url = f"http://0.0.0.0:8000", connection_timeout=60)
-                # pass
-                # self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
-                #                 model=model.name_or_path,
-                #                 # tensor_parallel_size=2,
-                #                 # device='cuda:1',
-                #                 gpu_memory_utilization=0.6,
-                #                 dtype=torch.bfloat16,
-                #                 max_num_seqs=128,
-                #                 disable_log_stats=True,
-                #
-                #                 max_num_batched_tokens=64 * 3500,
-                #                 trust_remote_code=True,
-                #
-                #                 # tensor_parallel_size=2,
-                #                 # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
-                #                 # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
-                #                 # This is particularly useful here because we generate completions from the same prompts.
-                #                 enable_prefix_caching=True,
-                #                 # max_model_len=24000,
-                #             ))
-                # self.vllm_client.log_requests = False
+                pass
+                self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
+                                model=model.name_or_path,
+                                # tensor_parallel_size=2,
+                                # device='cuda:1',
+                                gpu_memory_utilization=0.6,
+                                dtype=torch.bfloat16,
+                                max_num_seqs=128,
+                                disable_log_stats=True,
+
+                                max_num_batched_tokens=64 * 3500,
+                                trust_remote_code=True,
+
+                                # tensor_parallel_size=2,
+                                # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
+                                # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
+                                # This is particularly useful here because we generate completions from the same prompts.
+                                enable_prefix_caching=True,
+                                # max_model_len=24000,
+                            ))
+                self.vllm_client.log_requests = False
                 self.log_results_200(skip_first=True)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
@@ -605,27 +604,23 @@ class GRPOTrainer(Trainer):
         # self.ref_model = self.ref_model.to('cuda:1')
         # self.accelerator.device = 'cuda:0'
 
-    def pred_prompts(self, prompts):
-        """
-        Send *all* prompts to the vLLM server in one call and return the
-        decoded completions in the original order.
-        """
-        token_batches = self.vllm_client.generate(
-            prompts,
-            n=1,
-            temperature=0.0,  # greedy
-            top_p=1.0,
-            top_k=-1,
+    async def run_one(self, prompt: str, request_id: str) -> str:   # ← async
+        params = SamplingParams(
             max_tokens=5000,
-            repetition_penalty=1.0,
-            min_p=0.0,
+            temperature=0.0,
+            skip_special_tokens=False,
         )
+        async for out in self.vllm_client.generate(prompt, params, request_id):
+            if out.finished:
+                return out.outputs[0].text
+        return ""        # should not reach
 
-        # token_batches is List[List[int]] (one per prompt, n=1 flattened)
-        return [
-            self.tokenizer.decode(tok_ids, skip_special_tokens=False)
-            for tok_ids in token_batches
-        ]
+    # ── 2. batch helper ──────────────────────────────────────────────────────────
+    async def pred_prompts(self, prompts_list):
+        tasks = [asyncio.create_task(self.run_one(p, f"req-{i}"))
+                 for i, p in enumerate(prompts_list)]
+        return await asyncio.gather(*tasks)          #   no shutdown here
+
 
     def log_results_200(self, skip_first=False):
         if skip_first:
@@ -648,7 +643,7 @@ class GRPOTrainer(Trainer):
         prompt_list = df["problem"].apply(_prompt).tolist()
 
         # ---------- 1) vLLM -------------------------------------------------------
-        preds_vllm = self.pred_prompts(prompt_list)  # ← now synchronous
+        preds_vllm = asyncio.run(self.pred_prompts(prompt_list))     # ← await it
         df["pred_vllm"] = preds_vllm
         df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
 

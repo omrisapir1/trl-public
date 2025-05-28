@@ -140,6 +140,8 @@ class VLLMClient:
         min_p: float = 0.0,
         max_tokens: int = 16,
         guided_decoding_regex: Optional[str] = None,
+        logprobs: bool = True,
+        top_logprobs: int = 20,
     ) -> list[list[int]]:
         """
         Generates model completions for the provided prompts.
@@ -165,8 +167,9 @@ class VLLMClient:
                 Regular expression to guide the decoding process.
 
         Returns:
-            `list[list[int]]`:
-                List of lists of token IDs representing the model-generated completions for each prompt.
+            `dict` with keys
+            `"completion_ids"` – list[list[int]]
+            `"logprobs"` (if `logprobs=True`) – nested list of dicts
         """
         url = f"http://{self.host}:{self.server_port}/generate/"
         response = self.session.post(
@@ -184,7 +187,7 @@ class VLLMClient:
             },
         )
         if response.status_code == 200:
-            return response.json()["completion_ids"]
+            return response.json()
         else:
             raise Exception(f"Request failed: {response.status_code}, {response.text}")
 

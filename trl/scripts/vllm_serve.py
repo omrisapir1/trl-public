@@ -16,6 +16,7 @@ import argparse
 import logging
 import os
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import Optional, Sequence
 
 import torch
@@ -296,9 +297,12 @@ def main(script_args: ScriptArguments):
         min_p: float = 0.0
         max_tokens: int = 16
         guided_decoding_regex: Optional[str] = None
+        logprobs: bool = False  # “include logprobs in response?”
+        top_logprobs: int = 0  # how many alternatives (0-20)
 
     class GenerateResponse(BaseModel):
         completion_ids: list[list[int]]
+        logprobs: Optional[list[list[list[dict[int, float]]]]] = None
 
     @app.post("/generate/", response_model=GenerateResponse)
     async def generate(request: GenerateRequest):
@@ -340,10 +344,32 @@ def main(script_args: ScriptArguments):
             min_p=request.min_p,
             max_tokens=request.max_tokens,
             guided_decoding=guided_decoding,
+            logprobs=request.top_logprobs if request.logprobs else 0,
+
         )
         all_outputs = llm.generate(request.prompts, sampling_params=sampling_params)
-        completion_ids = [list(output.token_ids) for outputs in all_outputs for output in outputs.outputs]
-        return {"completion_ids": completion_ids}
+        all_outputs = list(chain.from_iterable(all_outputs))
+
+        completion_ids = [
+            list(output.token_ids)
+            for outputs in all_outputs
+            for output in outputs.outputs
+        ]
+
+        if request.logprobs:
+            lp_nested = [
+                [  # one completion
+                    {tid: lp for tid, lp in step.items()}
+                    for step in output.logprobs
+                ]
+                for outputs in all_outputs
+                for output in outputs.outputs
+            ]
+        else:
+            lp_nested = None
+
+        return {"completion_ids": completion_ids, "logprobs": lp_nested}
+
 
     class InitCommunicatorRequest(BaseModel):
         host: str
