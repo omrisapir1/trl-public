@@ -88,12 +88,12 @@ class VLLMClient:
             raise ImportError("vLLM is not installed. Please install it with `pip install vllm`.")
 
         self.session = requests.Session()
+
         self.host = host
         self.server_port = server_port
+        self.base_url = f"http://{self.host}:{self.server_port}"
         self.group_port = group_port
         self.check_server(connection_timeout)  # check server and fail after timeout
-        self.init_communicator()
-        atexit.register(self.close_communicator)  # when the client object is deleted, close the weight update group
 
     def check_server(self, total_timeout: float = 0.0, retry_interval: float = 2.0):
         """
