@@ -624,7 +624,7 @@ class GRPOTrainer(Trainer):
         # token_batches is List[List[int]] (one per prompt, n=1 flattened)
         return [
             self.tokenizer.decode(tok_ids, skip_special_tokens=False)
-            for tok_ids in token_batches
+            for tok_ids in token_batches['completion_ids']
         ]
 
     def log_results_200(self, skip_first=False):
