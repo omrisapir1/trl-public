@@ -30,7 +30,6 @@ from trl.import_utils import (
     is_fastapi_available,
     is_pydantic_available,
     is_uvicorn_available,
-    is_vllm_ascend_available,
     is_vllm_available,
 )
 
@@ -55,8 +54,6 @@ if is_vllm_available():
     from vllm.sampling_params import GuidedDecodingParams
     from vllm.utils import get_open_port
 
-    if is_vllm_ascend_available():
-        from vllm_ascend.distributed.device_communicators.pyhccl import PyHcclCommunicator as PyNcclCommunicator
 
 
 logger = logging.getLogger(__name__)
