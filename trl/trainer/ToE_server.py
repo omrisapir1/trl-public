@@ -204,7 +204,6 @@ class TreeOfThoughtsEntropyVLLM:
                 logprobs=LOGPROBS_K,
             )
             prompt_text = self.tokenizer.decode(node.prompt_ids)
-            ema_entropy = []
             at_splitable_token = False
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 if after_last_split:
@@ -218,26 +217,10 @@ class TreeOfThoughtsEntropyVLLM:
                 top = {tid: -99 if np.isinf(e.logprob) else e.logprob for tid, e in out.logprobs[-1].items() } if out.logprobs else {}
                 raw_H = 0.0
 
-
                 if len(top) > 1:
-
-
                     p = np.exp(list(top.values()));
                     p /= p.sum()
                     raw_H = float(-(p * np.log(p)).sum())
-                    # mvg_avg = np.mean(ema_entropy[-self.window_k:-1]) * (1 - self.alpha_ema) + self.alpha_ema * raw_H
-                    # ema_entropy.append(raw_H)
-
-
-
-                # --- split decision ------------------------------------------
-
-                # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
-                # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
-                # if at_splitable_token:
-                #     print(top.values())
-                #     print(raw_H)
-
 
                 if (
                         len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
@@ -299,9 +282,6 @@ class TreeOfThoughtsEntropyVLLM:
                     node.parent.add_child(child)
                     self._tasks = getattr(self, "_tasks", [])
                     self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-
-
-
 
 
             out = chunk.outputs[0]
