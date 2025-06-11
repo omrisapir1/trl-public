@@ -623,8 +623,8 @@ class GRPOTrainer(Trainer):
 
 
     def log_results_200(self, skip_first=False):
-        # if skip_first:
-        #     return
+        if skip_first:
+            return
 
         import pandas as pd, time, json, torch
         from transformers import GenerationConfig
@@ -832,7 +832,7 @@ class GRPOTrainer(Trainer):
 
             else:
                 state_dict = {k: p.detach().cpu() for k, p in unwrapped_model.state_dict().items()}
-                
+
             if self.accelerator.is_main_process:
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
                 # llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
