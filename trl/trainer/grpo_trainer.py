@@ -546,7 +546,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
-                self.log_results_200(skip_first=True)
+                self.log_results_200(skip_first=False)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
@@ -835,7 +835,11 @@ class GRPOTrainer(Trainer):
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
                 # llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
                 # llm_model.load_weights(state_dict.items())
-                asyncio.run(self.vllm_client.collective_rpc("load_model", state_dict, ))
+                state_dict = {
+                    k: p.detach().to(torch.bfloat16).cpu()  # ← .cpu() is mandatory
+                    for k, p in unwrapped_model.named_parameters()
+                }
+                await self.vllm_client.collective_rpc("load_model", state_dict, )
 
             # Unmerge the adapter to restore the model to its original state.
             # This must be done after loading weights to ensure they correspond to the merged state.
