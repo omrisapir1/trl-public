@@ -829,17 +829,16 @@ class GRPOTrainer(Trainer):
                     for k, v in state_dict.items()
                     if "original_module" not in k
                 }
+
             else:
-                state_dict = unwrapped_model.state_dict()
+                state_dict = {k: p.detach().cpu() for k, p in unwrapped_model.state_dict().items()}
+                
             if self.accelerator.is_main_process:
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
                 # llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
                 # llm_model.load_weights(state_dict.items())
-                state_dict = {
-                    k: p.detach().to(torch.bfloat16).cpu()  # ← .cpu() is mandatory
-                    for k, p in unwrapped_model.named_parameters()
-                }
-                await self.vllm_client.collective_rpc("load_model", state_dict, )
+
+                asyncio.run(self.vllm_client.collective_rpc("load_model", state_dict, ))
 
             # Unmerge the adapter to restore the model to its original state.
             # This must be done after loading weights to ensure they correspond to the merged state.
