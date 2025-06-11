@@ -8,7 +8,7 @@ try:
     from .extract_answer import extract_final_answer, math_equal
 except:
     from extract_answer import extract_final_answer, math_equal
-os.environ["VLLM_USE_V1"] = "0"
+
 # Copyright 2025 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
