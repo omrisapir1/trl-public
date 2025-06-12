@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import time
 
 from vllm import SamplingParams
@@ -52,7 +53,7 @@ from transformers import (
 )
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
-
+from safetensors.torch import save_file
 from ..data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
 from ..extras.profiling import profiling_context, profiling_decorator
 # from ..extras.vllm_client import VLLMClient
@@ -831,23 +832,20 @@ class GRPOTrainer(Trainer):
                 }
 
             else:
-                pass
-                # state_dict = {k: p.detach().cpu() for k, p in unwrapped_model.state_dict().items()}
+                state_dict = unwrapped_model.state_dict()
 
             if self.accelerator.is_main_process:
+
+                with tempfile.NamedTemporaryFile(suffix=".safetensors", dir="/dev/shm") as tmp:
+                    save_file(state_dict, tmp.name)  # ~3–4 s even for 13 B in /dev/shm
+                    asyncio(self.vllm_client.collective_rpc_async(
+                        "load_model",
+                        kwargs=dict(model=tmp.name, load_format="auto")
+                    ))
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
                 # llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
                 # llm_model.load_weights(state_dict.items())
-                for name, param in unwrapped_model.named_parameters():
-                    # cast + move to CPU (required for msgpack)
-                    cpu_tensor = param.detach().to(torch.bfloat16).cpu()
 
-                    # async RPC to every GPU worker
-                    asyncio.run( self.vllm_client.collective_rpc(
-                        "update_named_param",  # RPC name already registered
-                        name,  # first positional arg
-                        cpu_tensor,  # second positional arg
-                    ))
 
                 # asyncio.run(self.vllm_client.collective_rpc("load_model", state_dict, ))
 
