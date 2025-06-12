@@ -533,7 +533,7 @@ class GRPOTrainer(Trainer):
                                 model=model.name_or_path,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
-                                gpu_memory_utilization=0.6,
+                                gpu_memory_utilization=0.5,
                                 dtype=torch.bfloat16,
                                 max_num_seqs=128,
                                 disable_log_stats=True,
@@ -843,8 +843,9 @@ class GRPOTrainer(Trainer):
                     safe_serialization=True,
                     # <-- avoids the shared-tensor crash:contentReference[oaicite:0]{index=0}
                 )
-
+                asyncio.run(self.vllm_client.reset_prefix_cache())
                 asyncio.run(self.vllm_client.collective_rpc("load_model"))
+                asyncio.run(self.vllm_client.reset_prefix_cache())
                 torch.cuda.empty_cache()
 
 
