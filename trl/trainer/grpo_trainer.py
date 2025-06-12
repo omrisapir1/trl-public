@@ -835,13 +835,21 @@ class GRPOTrainer(Trainer):
                 state_dict = unwrapped_model.state_dict()
 
             if self.accelerator.is_main_process:
+                with tempfile.TemporaryDirectory(dir="/dev/shm") as ckpt_dir:
+                    unwrapped_model.save_pretrained(  # ties are fixed & files are *.safetensors
+                        ckpt_dir,
+                        safe_serialization=True,
+                        # <-- avoids the shared-tensor crash:contentReference[oaicite:0]{index=0}
+                    )
 
-                with tempfile.NamedTemporaryFile(suffix=".safetensors", dir="/dev/shm") as tmp:
-                    save_file({k:v.detach().cpu() for k,v in state_dict.items()}, tmp.name)
-                    asyncio.run(self.vllm_client.collective_rpc_async(
-                        "load_model",
-                        kwargs=dict(model=tmp.name, load_format="auto")
-                    ))
+                    # --- 2. tell the running vLLM engine to look at that folder ----------
+                    engine = self.vllm_client.engine_core  # AsyncLLMEngine inside TRL
+                    engine.vllm_config.model_config.model = ckpt_dir  # patch path in all processes
+
+                    # --- 3. hot-swap the weights *in-place* (NO kwargs!) ------------------
+                    asyncio.run(self.vllm_client.collective_rpc("load_model"))
+
+
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
                 # llm_model = self.vllm_client.engine.model_executor.driver_worker.model_runner.model
                 # llm_model.load_weights(state_dict.items())
