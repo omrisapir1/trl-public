@@ -845,6 +845,7 @@ class GRPOTrainer(Trainer):
                 )
 
                 asyncio.run(self.vllm_client.collective_rpc("load_model"))
+                torch.cuda.empty_cache()
 
 
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
