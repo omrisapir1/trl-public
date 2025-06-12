@@ -837,7 +837,7 @@ class GRPOTrainer(Trainer):
             if self.accelerator.is_main_process:
 
                 with tempfile.NamedTemporaryFile(suffix=".safetensors", dir="/dev/shm") as tmp:
-                    save_file(state_dict, tmp.name)  # ~3–4 s even for 13 B in /dev/shm
+                    save_file(unwrapped_model, tmp.name)  # ~3–4 s even for 13 B in /dev/shm
                     asyncio(self.vllm_client.collective_rpc_async(
                         "load_model",
                         kwargs=dict(model=tmp.name, load_format="auto")
