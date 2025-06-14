@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import time
+import uuid
 
 from vllm import SamplingParams
 from ..extras.vllm_client import VLLMClient
@@ -850,10 +851,10 @@ class GRPOTrainer(Trainer):
                 asyncio.run(self.vllm_client.collective_rpc("load_model"))
                 asyncio.run(self.vllm_client.reset_prefix_cache())
                 torch.cuda.empty_cache()
-                self.vllm_client.llm_engine.vllm_config.load_config.load_format = "auto"
+
                 async def generate_once(prompt: str) -> str:
                     # vLLM returns an async generator: iterate until the final chunk
-                    async for resp in self.vllm_client.generate(prompt, sampling, request_id="demo"):
+                    async for resp in self.vllm_client.generate(prompt, sampling, request_id=str(uuid.uuid4())):
                         pass  # consume the stream
                     return resp.outputs[0].text  # the full completion
 
