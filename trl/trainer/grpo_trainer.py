@@ -858,7 +858,7 @@ class GRPOTrainer(Trainer):
                         pass  # consume the stream
                     return resp.outputs[0].text  # the full completion
 
-                print(asyncio.run(generate_once("test it")))
+                print(asyncio.run(generate_once("<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n<|im_start|>user\nLet $x$ be a real number, $x > 1.$  Compute\n\\[\\sum_{n = 0}^\\infty \\frac{1}{x^{2^n} - x^{-2^n}}.\\]<|im_end|>\n<|im_start|>assistant\n")))
 
 
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
