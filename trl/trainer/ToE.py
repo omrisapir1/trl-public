@@ -189,7 +189,7 @@ class TreeOfThoughtsEntropyVLLM:
                 n.reward = n.compute_final_reward()
         root.answer = answer
         SAVE_DIR.joinpath(f"{time.time()}.json").write_text(json.dumps(root.to_dict(), indent=2))
-        self.engine.shutdown()
+        
         return root
 
     # ---------------------------------------------------------------- spawn ---
