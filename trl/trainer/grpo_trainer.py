@@ -842,15 +842,15 @@ class GRPOTrainer(Trainer):
 
             if self.accelerator.is_main_process:
 
-                # unwrapped_model.save_pretrained(  # ties are fixed & files are *.safetensors
-                #     self.model_dir,
-                #     safe_serialization=True,
-                #     # <-- avoids the shared-tensor crash:contentReference[oaicite:0]{index=0}
-                # )
-                # asyncio.run(self.vllm_client.reset_prefix_cache())
-                # asyncio.run(self.vllm_client.collective_rpc("load_model"))
-                # asyncio.run(self.vllm_client.reset_prefix_cache())
-                # torch.cuda.empty_cache()
+                unwrapped_model.save_pretrained(  # ties are fixed & files are *.safetensors
+                    self.model_dir,
+                    safe_serialization=True,
+                    # <-- avoids the shared-tensor crash:contentReference[oaicite:0]{index=0}
+                )
+                asyncio.run(self.vllm_client.reset_prefix_cache())
+                asyncio.run(self.vllm_client.collective_rpc("load_model"))
+                asyncio.run(self.vllm_client.reset_prefix_cache())
+                torch.cuda.empty_cache()
 
                 async def generate_once(prompt: str) -> str:
                     # vLLM returns an async generator: iterate until the final chunk
