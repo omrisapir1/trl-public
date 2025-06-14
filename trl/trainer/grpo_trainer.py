@@ -835,6 +835,9 @@ class GRPOTrainer(Trainer):
 
             else:
                 state_dict = unwrapped_model.state_dict()
+                sampling = SamplingParams(max_tokens=10,
+                                          temperature=0.0,
+                                          skip_special_tokens=False)
 
             if self.accelerator.is_main_process:
 
@@ -847,6 +850,14 @@ class GRPOTrainer(Trainer):
                 asyncio.run(self.vllm_client.collective_rpc("load_model"))
                 asyncio.run(self.vllm_client.reset_prefix_cache())
                 torch.cuda.empty_cache()
+
+                async def generate_once(prompt: str) -> str:
+                    # vLLM returns an async generator: iterate until the final chunk
+                    async for resp in self.vllm_client.generate(prompt, sampling, request_id="demo"):
+                        pass  # consume the stream
+                    return resp.outputs[0].text  # the full completion
+
+                print(asyncio.run(generate_once("test it")))
 
 
                 # llm_model = self.vllm_client.llm_engine.model_executor.driver_worker.model_runner.model
