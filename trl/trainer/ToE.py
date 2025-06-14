@@ -193,7 +193,7 @@ class TreeOfThoughtsEntropyVLLM:
 
     # ---------------------------------------------------------------- spawn ---
     async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
-
+        self.engine.reset_prefix_cache()
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
