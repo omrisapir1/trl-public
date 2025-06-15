@@ -569,7 +569,7 @@ class GRPOTrainer(Trainer):
             # desynchronization and seems to lead to DeepSpeed hanging during initialization. To prevent this, we
             # synchronize all processes after vLLM has been fully initialized.
             self.accelerator.wait_for_everyone()
-            # self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
+            self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         else:
             self.generation_config = GenerationConfig(
                 max_new_tokens=self.max_completion_length,
@@ -1017,14 +1017,14 @@ class GRPOTrainer(Trainer):
 
         problems = [x["problem"] for x in inputs]
         final_answers= [x["final_answer"] for x in inputs]
-        tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
+        # tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         if mode == "train":
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
             if self.state.global_step % self.num_iterations == 0 or buffered_inputs is None:
                 # tree_root = run_async(self.tree_of_thought.expand_tree(problem, final_answer))
                 trees = run_async(asyncio.gather(*[
-                    tree_of_thought.expand_tree(p, a)
+                    self.tree_of_thought.expand_tree(p, a)
                     for p, a in zip(problems, final_answers)
                 ]))
                 inputs = [self._convert_tree_to_training_inputs(t) for t in trees]
@@ -1033,6 +1033,7 @@ class GRPOTrainer(Trainer):
                 inputs = buffered_inputs
             self._step += 1
         else:
+            raise
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
             trees = run_async(asyncio.gather(*[
                 self.tree_of_thought.expand_tree(p, a)
