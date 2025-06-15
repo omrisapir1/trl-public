@@ -1033,7 +1033,7 @@ class GRPOTrainer(Trainer):
                 inputs = buffered_inputs
             self._step += 1
         else:
-            raise
+            
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
             trees = run_async(asyncio.gather(*[
                 self.tree_of_thought.expand_tree(p, a)
