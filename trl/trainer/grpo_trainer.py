@@ -1017,8 +1017,7 @@ class GRPOTrainer(Trainer):
 
         problems = [x["problem"] for x in inputs]
         final_answers= [x["final_answer"] for x in inputs]
-        self.tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
-        trees = [TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer) for _ in range(len(problems))]
+        trees = run_async([TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer) for _ in range(len(problems))])
         if mode == "train":
             buffer_index = self._step % self.args.gradient_accumulation_steps
             buffered_inputs = self._buffered_inputs[buffer_index]
