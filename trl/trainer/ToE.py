@@ -207,8 +207,7 @@ class TreeOfThoughtsEntropyVLLM:
             prompt_text = self.tokenizer.decode(node.prompt_ids)
             ema_entropy = []
             at_splitable_token = False
-            request_id = str(uuid.uuid4())
-            async for chunk in self.engine.generate(prompt_text, params, request_id=request_id):
+            async for chunk in self.engine.generate(prompt_text, params, request_id=uuid.uuid4()):
                 if after_last_split:
                     continue
                 out = chunk.outputs[0]
@@ -268,7 +267,7 @@ class TreeOfThoughtsEntropyVLLM:
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
-                        await self.engine.abort(request_id)
+                        # await self.engine.abort(request_id)
                     return  # stop parent stream
                 at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
 
