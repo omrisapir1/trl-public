@@ -292,7 +292,7 @@ class TreeOfThoughtsEntropyVLLM:
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                    await self.engine.abort(request_id)
+                    # await self.engine.abort(request_id)
                     return
 
                 else:
