@@ -211,6 +211,11 @@ class TreeOfThoughtsEntropyVLLM:
                 if after_last_split:
                     continue
                 out = chunk.outputs[0]
+                out.token_ids, out.text, out.logprobs = (
+                    [out.token_ids[-1]],
+                    self.tokenizer.decode([out.token_ids[-1]]),
+                    out.logprobs[-1:] if out.logprobs else None,
+                )
                 total_tokens = len(out.token_ids)
                 if node.depth and total_tokens < MIN_SPLIT_TOKENS:
                     continue
@@ -292,7 +297,7 @@ class TreeOfThoughtsEntropyVLLM:
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                    # await self.engine.abort(request_id)
+                    await self.engine.abort(request_id)
                     return
 
                 else:
@@ -308,6 +313,11 @@ class TreeOfThoughtsEntropyVLLM:
 
 
             out = chunk.outputs[0]
+            out.token_ids, out.text, out.logprobs = (
+                [out.token_ids[-1]],
+                self.tokenizer.decode([out.token_ids[-1]]),
+                out.logprobs[-1:] if out.logprobs else None,
+            )
             self._update_node_with_output(
                 node,
                 out,
