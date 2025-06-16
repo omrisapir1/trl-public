@@ -66,7 +66,6 @@ from ..import_utils import is_deepspeed_available, is_rich_available, is_vllm_av
 from ..models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
 from .callbacks import SyncRefModelCallback
 from .grpo_config import GRPOConfig
-from .ToT import TreeOfThoughts
 from .ToE import TreeOfThoughtsEntropyVLLM
 from .utils import (
     generate_model_card,
@@ -358,6 +357,7 @@ class GRPOTrainer(Trainer):
                 False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
             )
             model = AutoModelForCausalLM.from_pretrained(model,torch_dtype='auto',trust_remote_code=True, **model_init_kwargs)
+            model.save_pretrained(self.model_dir, safe_serialization=True)
             from collections import Counter
 
             # Count dtypes across all parameters
@@ -401,6 +401,7 @@ class GRPOTrainer(Trainer):
         # Processing class
         if processing_class is None:
             processing_class = AutoTokenizer.from_pretrained(model.config._name_or_path, padding_side="left")
+        processing_class.save_pretrained(self.model_dir)
 
         # Reward functions
         if not isinstance(reward_funcs, list):
@@ -531,7 +532,7 @@ class GRPOTrainer(Trainer):
             if self.accelerator.is_main_process:
                 pass
                 self.vllm_client = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
-                                model=model.name_or_path,
+                                model=self.model_dir,
                                 # tensor_parallel_size=2,
                                 # device='cuda:1',
                                 gpu_memory_utilization=0.4,
@@ -1033,7 +1034,7 @@ class GRPOTrainer(Trainer):
                 inputs = buffered_inputs
             self._step += 1
         else:
-            
+
             # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
             trees = run_async(asyncio.gather(*[
                 self.tree_of_thought.expand_tree(p, a)
