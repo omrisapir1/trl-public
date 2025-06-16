@@ -194,7 +194,6 @@ class TreeOfThoughtsEntropyVLLM:
 
     # ---------------------------------------------------------------- spawn ---
     async def _spawn(self, node: TreeNode, answer: str, after_last_split=False):
-
         async with self.sem:
             params = SamplingParams(
                 temperature=TEMP,
@@ -205,96 +204,108 @@ class TreeOfThoughtsEntropyVLLM:
                 logprobs=LOGPROBS_K,
             )
             prompt_text = self.tokenizer.decode(node.prompt_ids)
-            ema_entropy = []
+            token_accumulator = []
             at_splitable_token = False
+
             async for chunk in self.engine.generate(prompt_text, params, request_id=str(uuid.uuid4())):
                 if after_last_split:
                     continue
                 out = chunk.outputs[0]
-                total_tokens = len(out.token_ids)
-                if node.depth and total_tokens < MIN_SPLIT_TOKENS:
-                    continue
+                num_new = getattr(out, "num_generated_tokens", len(out.token_ids))  # fallback for API changes
+                # Defensive: If logprobs missing, make dummy list
+                logprobs_seq = out.logprobs if out.logprobs else [{} for _ in out.token_ids]
 
-                # --- entropy --------------------------------------------------
-                top = {tid: -99 if np.isinf(e.logprob) else e.logprob for tid, e in out.logprobs[-1].items() } if out.logprobs else {}
-                raw_H = 0.0
+                for i in range(num_new):
+                    # Get info for the "i-th" new token in this chunk
+                    tid = out.token_ids[-num_new + i]
+                    lp_dict = logprobs_seq[-num_new + i]
+                    token_text = self.tokenizer.decode([tid])
+                    token_accumulator.append(tid)
 
+                    # Entropy on this token
+                    top = {t: -99 if np.isinf(e) else e for t, e in lp_dict.items()} if lp_dict else {}
+                    raw_H = 0.0
+                    if len(top) > 1:
+                        p = np.exp(list(top.values()))
+                        p /= p.sum()
+                        raw_H = float(-(p * np.log(p)).sum())
 
-                if len(top) > 1:
-
-
-                    p = np.exp(list(top.values()));
-                    p /= p.sum()
-                    raw_H = float(-(p * np.log(p)).sum())
-                    # mvg_avg = np.mean(ema_entropy[-self.window_k:-1]) * (1 - self.alpha_ema) + self.alpha_ema * raw_H
-                    # ema_entropy.append(raw_H)
-
-
-
-                # --- split decision ------------------------------------------
-
-                # mvg_avg_normalized = mvg_avg / (1 + np.exp(-self.k * (total_tokens - self.t0)))
-                # mvg_avg_normalized = mvg_avg * np.sqrt(total_tokens / self.t0)
-                # if at_splitable_token:
-                #     print(top.values())
-                #     print(raw_H)
-
-
-                if (
-                        len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
-                        and at_splitable_token and not out.text[-1] in SPLITABLE_TOKENS
-                        # self.cur_split_count < MAX_TOTAL_SPLITS
-                ) or (node.depth==0):
-
-                    self.cur_split_count += 1
-
-                    # remove the high‑entropy token from parent, return its id
-                    tok_id = self._update_node_with_output(
-                        node,
-                        out,
-                        take_one_from_prompt=(node.depth != 0),
-                        remove_last_token=True,
+                    # Update node attributes "as if" one token was generated
+                    fake_output = type(out)(
+                        index=out.index,
+                        text=self.tokenizer.decode(token_accumulator),
+                        token_ids=token_accumulator.copy(),
+                        cumulative_logprob=None,
+                        logprobs=[lp_dict],  # only the last one matters
+                        finish_reason=None,
+                        stop_reason=None,
                     )
-                    next_prompt_ids = node.prompt_ids + node.completion_ids
 
-                    cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t == tok_id])
-                    probs = np.exp(np.array(cand_lps) / TEMP);
-                    probs /= probs.sum()
-                    alt_tid = int(np.random.choice(cand_ids, p=probs))
+                    # --- Split logic, exactly as before ---
+                    if (
+                            len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
+                            and at_splitable_token and not token_text in SPLITABLE_TOKENS
+                    ) or (node.depth == 0):
+                        self.cur_split_count += 1
 
-                    for forced in (tok_id, alt_tid):
-                        child = TreeNode(next_prompt_ids + [forced], depth=node.depth + 1, parent=node)
-                        node.add_child(child)
-                        self._tasks = getattr(self, "_tasks", [])
-                        self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
-                        # await self.engine.abort(request_id)
-                    return  # stop parent stream
-                at_splitable_token = out.text[-1] in SPLITABLE_TOKENS if out.text else False
+                        # remove the high‑entropy token from parent, return its id
+                        tok_id = self._update_node_with_output(
+                            node,
+                            fake_output,
+                            take_one_from_prompt=(node.depth != 0),
+                            remove_last_token=True,
+                        )
+                        next_prompt_ids = node.prompt_ids + node.completion_ids
 
+                        cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t == tok_id])
+                        probs = np.exp(np.array(cand_lps) / TEMP)
+                        probs /= probs.sum()
+                        alt_tid = int(np.random.choice(cand_ids, p=probs))
+
+                        for forced in (tok_id, alt_tid):
+                            child = TreeNode(next_prompt_ids + [forced], depth=node.depth + 1, parent=node)
+                            node.add_child(child)
+                            self._tasks = getattr(self, "_tasks", [])
+                            self._tasks.append(asyncio.create_task(self._spawn(child, answer)))
+                        return  # End this stream after split!
+
+                    # update splitable status for next iteration
+                    at_splitable_token = token_text in SPLITABLE_TOKENS
+
+                # If stream not split, continue to accumulate tokens.
+            # ----
+            # End of generation: handle last chunk
             take_one_from_prompt = False
             if not after_last_split:
-                last_occurrence_found = last_occurrence(out.text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
-                new_completion_ids = self.tokenizer.encode(out.text[:last_occurrence_found + 1])
+                out = chunk.outputs[0]  # last chunk's output
+                # Try to find last splitable point
+                gen_text = self.tokenizer.decode(token_accumulator)
+                last_occurrence_found = last_occurrence(gen_text[:-LAST_SPLIT_MIN_CHARS], SPLITABLE_TOKENS)
+                new_completion_ids = self.tokenizer.encode(gen_text[:last_occurrence_found + 1])
                 if last_occurrence_found != -1 and len(new_completion_ids) > MIN_SPLIT_TOKENS:
-
+                    fake_output = type(out)(
+                        index=out.index,
+                        text=self.tokenizer.decode(new_completion_ids),
+                        token_ids=new_completion_ids,
+                        cumulative_logprob=None,
+                        logprobs=[logprobs_seq[-1]],
+                        finish_reason=None,
+                        stop_reason=None,
+                    )
                     self._update_node_with_output(
                         node,
-                        out,
+                        fake_output,
                         take_one_from_prompt=(node.depth != 0),
                         remove_last_token=False,
                         new_completion_ids=new_completion_ids,
-
                     )
                     next_prompt_ids = node.prompt_ids + node.completion_ids
-
                     for _ in range(4):
                         child = TreeNode(next_prompt_ids, depth=node.depth + 1, parent=node)
                         node.add_child(child)
                         self._tasks = getattr(self, "_tasks", [])
                         self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
-                    # await self.engine.abort(request_id)
                     return
-
                 else:
                     take_one_from_prompt = True
                     next_prompt_ids = node.prompt_ids[:-1]
@@ -303,17 +314,21 @@ class TreeOfThoughtsEntropyVLLM:
                     self._tasks = getattr(self, "_tasks", [])
                     self._tasks.append(asyncio.create_task(self._spawn(child, answer, after_last_split=True)))
 
-
-
-
-
-            out = chunk.outputs[0]
+            # Final output for this node
+            fake_output = type(out)(
+                index=out.index,
+                text=self.tokenizer.decode(token_accumulator),
+                token_ids=token_accumulator.copy(),
+                cumulative_logprob=None,
+                logprobs=[logprobs_seq[-1]],
+                finish_reason=None,
+                stop_reason=None,
+            )
             self._update_node_with_output(
                 node,
-                out,
+                fake_output,
                 take_one_from_prompt=take_one_from_prompt,
-                remove_last_token=False,  # keep last token
-
+                remove_last_token=False,
             )
             node.state = NodeState.TERMINAL
             node.stop_reason = StopReason.DONE
