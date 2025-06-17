@@ -246,7 +246,7 @@ class TreeOfThoughtsEntropyVLLM:
                         )
                         next_prompt_ids = node.prompt_ids + node.completion_ids
 
-                        cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t == tok_id])
+                        cand_ids, cand_lps = zip(*[(t, lp) for t, lp in top.items() if t != tok_id])
                         probs = np.exp(np.array(cand_lps) / TEMP);
                         probs /= probs.sum()
                         alt_tid = int(np.random.choice(cand_ids, p=probs))
