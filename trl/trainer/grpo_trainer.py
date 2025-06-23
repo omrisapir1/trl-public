@@ -644,8 +644,8 @@ class GRPOTrainer(Trainer):
             )
 
         # ---------- load test set -------------------------------------------------
-        df = pd.read_csv("/workspace/Qwq_32b_awq_greedy_200_test.csv")
-        prompt_list = df["problem"].apply(_prompt).tolist()
+        df = pd.read_pickle("/workspace/gsm8k_test.pkl")
+        prompt_list = df["question"].apply(_prompt).tolist()
 
         # ---------- 1) vLLM -------------------------------------------------------
         preds_vllm = asyncio.run(self.pred_prompts(prompt_list))     # ← await it
@@ -658,49 +658,49 @@ class GRPOTrainer(Trainer):
         ).mean()
         tok_avg_vllm = df["pred_vllm"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
 
-        if skip_first:
-            print(acc_vllm, tok_avg_vllm)
-            return
-
-        # ---------- 2) Transformers ----------------------------------------------
-        def _pred_xfmr(prompts, batch_size=16):
-            gen_cfg = GenerationConfig(
-                max_new_tokens=3000,
-                temperature=0.0,
-                do_sample=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-            )
-            self.model.eval()
-            device = next(self.model.parameters()).device
-            outs = []
-            for i in range(0, len(prompts), batch_size):
-                batch = prompts[i : i + batch_size]
-                toks = self.tokenizer(batch, return_tensors="pt", padding=True).to(device)
-                with torch.no_grad():
-                    gen = self.model.generate(**toks, generation_config=gen_cfg)
-                prompt_len = toks["input_ids"].shape[1]
-                outs.extend(
-                    self.tokenizer.batch_decode(gen[:, prompt_len:], skip_special_tokens=False)
-                )
-            return outs
-
-        preds_xfmr = _pred_xfmr(prompt_list)
-        df["pred_xfmr"] = preds_xfmr
-        df["numerical_pred_xfmr"] = df["pred_xfmr"].apply(extract_final_answer)
-
-        acc_xfmr = df.apply(
-            lambda r: math_equal(r["numerical_solution"], r["numerical_pred_xfmr"]),
-            axis=1,
-        ).mean()
-        tok_avg_xfmr = df["pred_xfmr"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
+        # if skip_first:
+        #     print(acc_vllm, tok_avg_vllm)
+        #     return
+        #
+        # # ---------- 2) Transformers ----------------------------------------------
+        # def _pred_xfmr(prompts, batch_size=16):
+        #     gen_cfg = GenerationConfig(
+        #         max_new_tokens=3000,
+        #         temperature=0.0,
+        #         do_sample=False,
+        #         pad_token_id=self.tokenizer.pad_token_id,
+        #         eos_token_id=self.tokenizer.eos_token_id,
+        #     )
+        #     self.model.eval()
+        #     device = next(self.model.parameters()).device
+        #     outs = []
+        #     for i in range(0, len(prompts), batch_size):
+        #         batch = prompts[i : i + batch_size]
+        #         toks = self.tokenizer(batch, return_tensors="pt", padding=True).to(device)
+        #         with torch.no_grad():
+        #             gen = self.model.generate(**toks, generation_config=gen_cfg)
+        #         prompt_len = toks["input_ids"].shape[1]
+        #         outs.extend(
+        #             self.tokenizer.batch_decode(gen[:, prompt_len:], skip_special_tokens=False)
+        #         )
+        #     return outs
+        #
+        # preds_xfmr = _pred_xfmr(prompt_list)
+        # df["pred_xfmr"] = preds_xfmr
+        # df["numerical_pred_xfmr"] = df["pred_xfmr"].apply(extract_final_answer)
+        #
+        # acc_xfmr = df.apply(
+        #     lambda r: math_equal(r["numerical_solution"], r["numerical_pred_xfmr"]),
+        #     axis=1,
+        # ).mean()
+        # tok_avg_xfmr = df["pred_xfmr"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
 
         # ---------- save & print --------------------------------------------------
         res = {
             "accuracy_vllm": float(acc_vllm),
-            "accuracy_xfmr": float(acc_xfmr),
+            # "accuracy_xfmr": float(acc_xfmr),
             "tokens_avg_vllm": float(tok_avg_vllm),
-            "tokens_avg_xfmr": float(tok_avg_xfmr),
+            # "tokens_avg_xfmr": float(tok_avg_xfmr),
         }
         ts = time.time()
         with open(f"/workspace/eval_{ts:.0f}.json", "w") as f:
@@ -1016,7 +1016,7 @@ class GRPOTrainer(Trainer):
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "eval" if self.control.should_evaluate else "train"
 
-        problems = [x["problem"] for x in inputs]
+        problems = [x["question"] for x in inputs]
         final_answers= [x["final_answer"] for x in inputs]
         # tree_of_thought = TreeOfThoughtsEntropyVLLM(engine=self.vllm_client, tokenizer=self.tokenizer)
         if mode == "train":
