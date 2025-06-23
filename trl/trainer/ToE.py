@@ -16,7 +16,7 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 
 MAX_STREAMS = 128
-TAU = 1.2#1#0.6  # threshold on EMA entropy
+TAU = 0.6#1#0.6  # threshold on EMA entropy
 # TAU = [1.1, 1.5 , 1.4 , 1.3, 0.9 ,0.9, 1.1]
 TEMP = 0.8
 TOP_P = 0.9
@@ -24,7 +24,7 @@ TOP_K = 30
 REP_PENALTY = 1.1
 LOGPROBS_K = 20
 MAX_TOKENS = 1300
-MIN_SPLIT_TOKENS = 180
+MIN_SPLIT_TOKENS = 120
 LAST_SPLIT_MIN_CHARS = 150
 
 
@@ -228,7 +228,7 @@ class TreeOfThoughtsEntropyVLLM:
                         raw_H = float(-(p * np.log(p)).sum())
                     out_tokens = outs.token_ids[:token_index+1]
                     out_text = self.tokenizer.decode(out_tokens)
-                    
+
                     if (
                             len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
                             and at_splitable_token and not out_text[-1] in SPLITABLE_TOKENS
