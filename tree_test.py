@@ -4,8 +4,8 @@ from trl import GRPOTrainer, GRPOConfig
 import random
 
 
-df = pd.read_pickle('50K_trpo_trainset.pkl')[['problem','final_answer']]
-df = df[df['final_answer'].apply(lambda x: all(i.isdigit() or i=='.' for i in x))]
+df = pd.read_pickle('gm.gsm8k_train')[['question','final_answer']]
+
 hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 
 
@@ -13,7 +13,7 @@ hf_dataset = Dataset.from_pandas(df, preserve_index=False)
 def dumy_func(completions, **kwargs):
     return
 
-training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, num_train_epochs=1,logging_steps=20,save_steps=200, ref_model_sync_steps=600,bf16=True,num_generations=1, per_device_train_batch_size=16)
+training_args = GRPOConfig(output_dir="GRPO", use_vllm=True,sync_ref_model=True, num_train_epochs=1,logging_steps=20,save_steps=100, ref_model_sync_steps=120,bf16=True,num_generations=1, per_device_train_batch_size=16)
 
 
 trainer = GRPOTrainer(
@@ -24,6 +24,3 @@ trainer = GRPOTrainer(
 
 )
 trainer.train()
-
-trainer.log_results_200()
-trainer.save_model('test/save')

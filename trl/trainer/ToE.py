@@ -228,8 +228,7 @@ class TreeOfThoughtsEntropyVLLM:
                         raw_H = float(-(p * np.log(p)).sum())
                     out_tokens = outs.token_ids[:token_index+1]
                     out_text = self.tokenizer.decode(out_tokens)
-                    if at_splitable_token and not out_text[-1] in SPLITABLE_TOKENS:
-                        print(raw_H)
+                    
                     if (
                             len(top) > 1 and node.depth < MAX_DEPTH_SPLIT and raw_H > TAU
                             and at_splitable_token and not out_text[-1] in SPLITABLE_TOKENS
