@@ -551,7 +551,7 @@ class GRPOTrainer(Trainer):
                                 # max_model_len=24000,
                             ))
                 self.vllm_client.log_requests = False
-                self.log_results_200(skip_first=True)
+                self.log_results_200(skip_first=False)
             # VLLMClient(
                 #     args.vllm_server_host, args.vllm_server_port, connection_timeout=args.vllm_server_timeout
                 # )
