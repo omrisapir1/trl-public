@@ -653,7 +653,7 @@ class GRPOTrainer(Trainer):
         df["numerical_pred_vllm"] = df["pred_vllm"].apply(extract_final_answer)
 
         acc_vllm = df.apply(
-            lambda r: math_equal(r["numerical_solution"], r["numerical_pred_vllm"]),
+            lambda r: math_equal(r["final_answer"], r["numerical_pred_vllm"]),
             axis=1,
         ).mean()
         tok_avg_vllm = df["pred_vllm"].apply(lambda t: len(self.tokenizer.encode(t))).mean()
